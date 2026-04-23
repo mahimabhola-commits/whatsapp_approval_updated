@@ -314,9 +314,8 @@ if(location.protocol === 'file:' && navigator.userAgent.indexOf('Firefox') === -
 //  Get key:  https://console.anthropic.com/
 // ════════════════════════════════════════════════════════════
 const CLAUDE_MODEL    = 'claude-sonnet-4-6';
-// Browsers cannot call api.anthropic.com directly (CORS blocked).
-// corsproxy.io acts as a relay — forwards all headers including x-api-key to Anthropic.
-const CLAUDE_ENDPOINT = 'https://corsproxy.io/?url=https://api.anthropic.com/v1/messages';
+// Called directly from the browser using Anthropic's official browser-access header.
+const CLAUDE_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 
 let API_KEY = '';
 const logs = { demand:[], supply:[] };
@@ -943,9 +942,10 @@ async function callClaude(prompt, maxTokens, retryCount){
     res = await fetch(CLAUDE_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01'
+        'Content-Type':                              'application/json',
+        'x-api-key':                                 API_KEY,
+        'anthropic-version':                         '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify(body)
     });
