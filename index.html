@@ -1,58 +1,1228 @@
-// WA Template Studio — Cloudflare Worker Proxy
-// Sits between GitHub Pages (browser) and Anthropic API.
-// Adds CORS headers so the browser can make the call.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WA Template Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&amp;family=DM+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-api-key, anthropic-version',
-};
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║         HOW TO USE THIS TOOL SAFELY  —  READ BEFORE USE         ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  POWERED BY: Anthropic Claude API (claude-sonnet-4-6)           ║
+║                                                                  ║
+║  GET YOUR API KEY:                                               ║
+║  → https://console.anthropic.com/                               ║
+║  (Sign in → "API Keys" → "Create Key" → Copy it)               ║
+║                                                                  ║
+║  IS MY KEY SAFE IN THIS FILE?                                    ║
+║  ✅ Your key NEVER gets saved to any file or server.             ║
+║  ✅ It only lives in your browser tab's memory.                  ║
+║  ✅ It disappears the moment you close or refresh the tab.       ║
+║  ✅ It goes ONLY to Anthropic's own API — nowhere else.          ║
+║  ❌ Don't share your screen while the key is visible.            ║
+║  ❌ Don't hardcode your key inside this HTML file.               ║
+║                                                                  ║
+║  ABOUT .ENV FILES (for future reference):                        ║
+║  A .env file is for SERVER-side code (Node.js / Python).        ║
+║  For a plain HTML file like this one, the safest approach IS    ║
+║  what we do here — paste your key at runtime, never store it.   ║
+║  If you ever build a backend server later, create a .env file:  ║
+║    ANTHROPIC_API_KEY=sk-ant-...                                  ║
+║  And add ".env" to your .gitignore so it never leaks to GitHub. ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+-->
 
-export default {
-  async fetch(request) {
-
-    // CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
-
-    const apiKey = request.headers.get('x-api-key') || '';
-    if (!apiKey.startsWith('sk-ant-')) {
-      return json({ error: { message: 'Missing or invalid Claude API key' } }, 401);
-    }
-
-    try {
-      const body = await request.text();
-
-      const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type':      'application/json',
-          'x-api-key':         apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body,
-      });
-
-      const data = await upstream.text();
-      return new Response(data, {
-        status: upstream.status,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-      });
-
-    } catch (err) {
-      return json({ error: { message: 'Proxy error: ' + err.message } }, 500);
-    }
-  }
-};
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-  });
+<style>
+:root{
+  --g:#25D366;--gd:#128C7E;--gp:#e9faf2;--gm:#c5f0d8;
+  --ap:#fef3c7;--rp:#fee2e2;--bp:#e8f0fe;
+  --bg:#f5f5f0;--sur:#fff;--bdr:#e2e2da;
+  --tx:#1a1a18;--mu:#6b6b62;
+  --r:12px;--rs:8px;
 }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+header{background:var(--sur);border-bottom:1px solid var(--bdr);padding:0 2rem;height:58px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap}
+.logo-box{width:30px;height:30px;background:var(--g);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-box svg{width:16px;height:16px;fill:#fff}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.badge-util{font-size:10px;font-weight:600;background:var(--gp);color:var(--gd);border:1px solid var(--gm);padding:2px 9px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase}
+.badge-ai{font-size:10px;font-weight:600;background:#e8f0fe;color:#1557b0;border:1px solid #b3d0ff;padding:2px 9px;border-radius:20px;letter-spacing:.5px;margin-left:auto}
+.wrap{max-width:1060px;margin:0 auto;padding:2rem 1.5rem}
+.pg-title{font-size:21px;font-weight:600;letter-spacing:-.5px;margin-bottom:4px}
+.pg-sub{font-size:13px;color:var(--mu);margin-bottom:1.75rem}
+.api-banner{background:var(--sur);border:1.5px solid var(--bdr);border-radius:var(--r);padding:1.2rem 1.4rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;transition:border-color .2s,background .2s}
+.api-banner.connected{border-color:var(--g);background:var(--gp)}
+.api-ico{font-size:22px;padding-top:2px;flex-shrink:0}
+.api-info{flex:1;min-width:180px}
+.api-info h3{font-size:13px;font-weight:600;margin-bottom:3px}
+.api-info p{font-size:12px;color:var(--mu);line-height:1.6}
+.api-info a{color:var(--gd);text-decoration:none;font-weight:500}
+.api-controls{display:flex;flex-direction:column;gap:6px;min-width:280px}
+.api-input-row{display:flex;gap:8px}
+.api-input{flex:1;padding:8px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:12px;font-family:'DM Mono',monospace;background:var(--sur);color:var(--tx);transition:border-color .15s}
+.api-input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px var(--gp)}
+.api-note{font-size:11px;color:var(--mu)}
+.api-note a{color:var(--gd);text-decoration:none}
+.api-status{font-size:12px;font-weight:600;color:var(--gd)}
+.sheet-strip{background:#fffbeb;border:1px solid #fde68a;border-radius:var(--rs);padding:9px 14px;margin-bottom:1.75rem;font-size:12px;color:#78350f;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sheet-strip a{color:#92400e;font-weight:600;margin-left:auto;white-space:nowrap;text-decoration:none}
+.sheet-strip a:hover{text-decoration:underline}
+.lob-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.75rem}
+.lob-card{background:var(--sur);border:1.5px solid var(--bdr);border-radius:var(--r);padding:1.1rem 1.4rem;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:12px}
+.lob-card:hover{border-color:var(--g);box-shadow:0 0 0 3px var(--gp)}
+.lob-card.active{border-color:var(--g);background:var(--gp);box-shadow:0 0 0 3px var(--gm)}
+.lob-ico{width:42px;height:42px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.lob-ico.d{background:#fff3e0}.lob-ico.s{background:#e3f2fd}
+.lob-info h3{font-size:14px;font-weight:600}
+.lob-info p{font-size:12px;color:var(--mu);margin-top:2px}
+.lob-chk{margin-left:auto;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bdr);display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.lob-card.active .lob-chk{background:var(--g);border-color:var(--g)}
+.lob-chk svg{width:10px;height:10px;fill:none;stroke:#fff;stroke-width:2.5;display:none}
+.lob-card.active .lob-chk svg{display:block}
+.tabs{display:flex;gap:3px;margin-bottom:1.25rem;background:var(--bg);border-radius:var(--rs);padding:3px;width:fit-content}
+.tab-btn{padding:7px 16px;border-radius:6px;font-size:13px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--mu);transition:all .14s;font-family:'DM Sans',sans-serif}
+.tab-btn.active{background:var(--sur);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:1.4rem;margin-bottom:1rem}
+.card-ttl{font-size:13px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--g);flex-shrink:0}
+label{display:block;font-size:12px;font-weight:500;color:var(--mu);margin-bottom:5px}
+textarea,input[type=text]{width:100%;padding:9px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;color:var(--tx);background:var(--sur);transition:border-color .15s;resize:vertical}
+textarea{min-height:90px}
+textarea:focus,input[type=text]:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px var(--gp)}
+.form-row{margin-bottom:.9rem}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif}
+.btn-primary{background:var(--g);color:#fff}.btn-primary:hover{background:var(--gd)}
+.btn-secondary{background:var(--bg);color:var(--tx);border:1px solid var(--bdr)}.btn-secondary:hover{background:var(--bdr)}
+.btn-sm{padding:6px 13px;font-size:12px}
+.btn-row{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
+.out-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+.out-box{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rs);padding:1rem;position:relative}
+.out-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--mu);margin-bottom:8px}
+.out-content{font-size:13px;line-height:1.65;color:var(--tx);font-family:'DM Mono',monospace;white-space:pre-wrap;min-height:50px}
+.out-content .vr{background:var(--ap);color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:0 4px;font-size:12px}
+.copy-btn{position:absolute;top:8px;right:8px;background:var(--sur);border:1px solid var(--bdr);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--mu);font-family:'DM Sans',sans-serif}
+.copy-btn:hover{background:var(--gp);color:var(--gd)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.b-ok{background:var(--gp);color:var(--gd);border:1px solid var(--gm)}
+.b-no{background:var(--rp);color:#b91c1c;border:1px solid #fca5a5}
+.b-pend{background:var(--ap);color:#92400e;border:1px solid #fde68a}
+.bdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.strategy-box{border:1px solid #c7d8f8;border-radius:var(--rs);background:var(--bp);padding:12px 14px;margin-top:12px}
+.strategy-ttl{font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.strategy-row{display:flex;gap:10px;margin-bottom:6px;align-items:flex-start}
+.strategy-label{font-size:11px;font-weight:600;color:var(--mu);min-width:120px;flex-shrink:0;padding-top:1px}
+.strategy-val{font-size:12px;color:var(--tx);line-height:1.5}
+.upzone{border:2px dashed var(--bdr);border-radius:var(--r);padding:2rem;text-align:center;cursor:pointer;transition:all .15s}
+.upzone:hover,.upzone.drag{border-color:var(--g);background:var(--gp)}
+.ui{font-size:30px;margin-bottom:8px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{text-align:left;padding:9px 12px;background:var(--bg);border-bottom:1px solid var(--bdr);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mu)}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--bdr);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafaf8}
+.var-pill{background:var(--ap);color:#92400e;border:1px solid #fde68a;border-radius:4px;padding:2px 6px;font-size:11px;font-family:'DM Mono',monospace}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.2rem}
+.stat-c{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rs);padding:.9rem;text-align:center}
+.stat-n{font-size:26px;font-weight:600;letter-spacing:-1px}
+.stat-l{font-size:12px;color:var(--mu);margin-top:2px}
+.log-row{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--bdr)}
+.log-row:last-child{border-bottom:none}
+.log-name{font-size:13px;font-weight:600;margin-bottom:5px}
+.log-sample{font-size:12px;color:var(--mu);font-family:'DM Mono',monospace;line-height:1.5;margin-bottom:8px;max-width:500px}
+.status-sel{padding:5px 10px;border:1px solid var(--bdr);border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--sur);cursor:pointer}
+.status-sel:focus{outline:none;border-color:var(--g)}
+.tip{font-size:12px;color:var(--mu);background:var(--bp);border:1px solid #c7d8f8;border-radius:var(--rs);padding:8px 12px;margin-top:8px}
+.ld{display:flex;align-items:center;gap:8px;color:var(--mu);font-size:13px}
+.spin{width:15px;height:15px;border:2px solid var(--bdr);border-top-color:var(--g);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--tx);color:#fff;padding:10px 16px;border-radius:var(--rs);font-size:13px;font-weight:500;transform:translateY(16px);opacity:0;transition:all .2s;pointer-events:none;z-index:9999}
+.toast.show{transform:translateY(0);opacity:1}
+.hidden{display:none!important}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--mu);font-size:13px}
+.empty .ei{font-size:32px;margin-bottom:8px}
+.err-box{margin-top:10px;font-size:12px;color:#b91c1c;background:var(--rp);padding:8px 12px;border-radius:var(--rs);border:1px solid #fca5a5}
+@media(max-width:620px){.lob-row,.out-grid,.stats-row{grid-template-columns:1fr}.wrap{padding:1rem}.api-banner{flex-direction:column}.badge-ai{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-box">
+    <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.849L.057 23.617a.75.75 0 00.91.91l5.82-1.463A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
+  </div>
+  <span class="logo-name">MB WA Template Studio</span>
+  <span class="badge-util">Utility Optimizer</span>
+  <span class="badge-ai">⚡ Claude Sonnet 4.6</span>
+</header>
+
+<div class="wrap">
+  <h1 class="pg-title">WhatsApp Template Approver</h1>
+  <p class="pg-sub">Converts promotional copy into Meta utility-approved templates — using Spinny's own approved examples as the playbook. Minimum brand changes guaranteed.</p>
+
+  <!-- CLAUDE API KEY -->
+  <div class="api-banner" id="api-banner">
+    <div class="api-ico">🔑</div>
+    <div class="api-info">
+      <h3 id="api-heading">Connect your Claude API Key</h3>
+      <p>Get your key at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com → API Keys</a> — sign in, click "Create Key", paste it here. Your key is never saved — it disappears when you close this tab.</p>
+    </div>
+    <div class="api-controls">
+      <div class="api-input-row">
+        <input class="api-input" type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off" onkeydown="if(event.key==='Enter')saveKey()">
+        <button class="btn btn-primary btn-sm" id="connect-btn" onclick="saveKey()">Connect</button>
+        <button class="btn btn-secondary btn-sm hidden" id="disconnect-btn" onclick="clearKey()">Disconnect</button>
+      </div>
+      <div class="api-note">Key starts with <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace">sk-ant-</code> &nbsp;·&nbsp; <a href="https://console.anthropic.com/" target="_blank">Get key →</a></div>
+      <div class="api-status hidden" id="api-status">✅ Connected — ready to generate templates</div>
+    </div>
+  </div>
+
+  <!-- SHEET STRIP -->
+  <div class="sheet-strip" id="sheet-strip">
+    📊 <strong>Reference sheet:</strong>&nbsp; <span id="sheet-status">Paste your Apps Script URL below to connect live sheet data.</span>
+    <a href="https://docs.google.com/spreadsheets/d/1jZfvZ-NySW5afPlxMg1kA3jrluiR1JF9A362QaV36uo/edit" target="_blank">View sheet ↗</a>
+  </div>
+  <div class="api-banner" id="gas-banner" style="margin-bottom:1rem">
+    <div class="api-ico">📋</div>
+    <div class="api-info">
+      <h3 id="gas-heading">Connect Google Apps Script URL</h3>
+      <p>In your sheet → <strong>Extensions → Apps Script</strong> → paste the <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace">doGet()</code> web app URL here. <a href="https://docs.google.com/spreadsheets/d/1jZfvZ-NySW5afPlxMg1kA3jrluiR1JF9A362QaV36uo/edit" target="_blank">Open sheet ↗</a></p>
+    </div>
+    <div class="api-controls">
+      <div class="api-input-row">
+        <input class="api-input" type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" onkeydown="if(event.key==='Enter')saveGasUrl()">
+        <button class="btn btn-primary btn-sm" id="gas-connect-btn" onclick="saveGasUrl()">Connect</button>
+        <button class="btn btn-secondary btn-sm hidden" id="gas-disconnect-btn" onclick="clearGasUrl()">Disconnect</button>
+      </div>
+      <div class="api-note">URL starts with <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace">https://script.google.com/macros/s/</code></div>
+      <div class="api-status hidden" id="gas-status">✅ Apps Script connected — sheet data loading…</div>
+    </div>
+  </div>
+
+  <!-- ══ MAIN PANEL ══ -->
+  <div id="panel-demand" class="panel active">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('demand','compose')">✍️ Compose</button>
+      <button class="tab-btn" onclick="switchTab('demand','review')">📋 Bulk Review</button>
+      <button class="tab-btn" onclick="switchTab('demand','log')">✅ Approval Log</button>
+    </div>
+    <div id="demand-compose" class="panel active">
+      <div class="card">
+        <div class="card-ttl"><span class="dot"></span>Paste your promotional copy</div>
+        <div class="form-row">
+          <label>Raw promotional copy <span style="color:var(--mu);font-weight:400">(paste exactly as-is, including [placeholders])</span></label>
+          <textarea id="d-copy" rows="6" placeholder="Example:&#10;Hi [name], Exclusive ₹20,000 OFF for you!&#10;The [Car Model] you viewed is available at an offer price of [price] along with loans starting @10.99%.&#10;Click here to book it before midnight:&#10;Thank you for trusting Spinny"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="generate('demand')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Generate Utility Template
+          </button>
+          <button class="btn btn-secondary" onclick="clearF('demand')">Clear</button>
+        </div>
+        <div id="d-ld" class="ld hidden" style="margin-top:10px"><div class="spin"></div>Analysing copy and generating utility-safe template…</div>
+        <div id="d-err" class="err-box hidden"></div>
+      </div>
+      <div id="d-out" class="hidden">
+        <div class="card">
+          <div class="card-ttl"><span class="dot"></span>Generated Template</div>
+          <div class="out-grid">
+            <div class="out-box">
+              <div class="out-lbl">📝 Template Body — with {{variables}}</div>
+              <button class="copy-btn" onclick="cp('d-tb')">Copy</button>
+              <div class="out-content" id="d-tb"></div>
+            </div>
+            <div id="d-vtbl" class="out-box" style="background:var(--bg)"></div>
+          </div>
+          <div id="d-sc" style="display:none"></div>
+          <div id="d-strategy" style="margin-top:1rem"></div>
+          <div id="d-verdict" style="margin-top:.75rem"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm" onclick="saveLog('demand')">💾 Save to Approval Log</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="demand-review" class="panel">
+      <div class="card">
+        <div class="card-ttl"><span class="dot"></span>Bulk review via Excel upload</div>
+        <div class="upzone" id="d-upz" onclick="document.getElementById('d-file').click()" ondragover="dov(event,'d-upz')" ondragleave="dlv('d-upz')" ondrop="ddr(event,'d-file','demand')">
+          <div class="ui">📊</div>
+          <p><strong>Click to upload</strong> or drag &amp; drop your Excel file</p>
+          <p style="font-size:11px;margin-top:4px;color:var(--mu)">Required columns: <strong>Template Name</strong> &nbsp;·&nbsp; <strong>Message Copy</strong></p>
+        </div>
+        <input type="file" id="d-file" accept=".xlsx,.xls" style="display:none" onchange="handleXL(event,'demand')">
+        <div class="tip">💡 Make sure your Excel has <strong>Template Name</strong> and <strong>Message Copy</strong> columns. Each row is analysed one by one — large batches may take a few minutes.</div>
+      </div>
+      <div id="d-bsec" class="hidden">
+        <div class="stats-row">
+          <div class="stat-c"><div class="stat-n" id="d-st">0</div><div class="stat-l">Total analysed</div></div>
+          <div class="stat-c"><div class="stat-n" style="color:var(--g)" id="d-sp">0</div><div class="stat-l">Likely approved ✅</div></div>
+          <div class="stat-c"><div class="stat-n" style="color:#ef4444" id="d-sf">0</div><div class="stat-l">Needs revision ⚠️</div></div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="tbl-wrap">
+            <table><thead><tr><th>#</th><th>Template name</th><th>Sample content</th><th>Variables</th><th>Verdict</th><th>Reason</th></tr></thead>
+            <tbody id="d-btb"></tbody></table>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:1rem">
+          <button class="btn btn-primary btn-sm" onclick="exportXL('demand')">⬇️ Export as Excel</button>
+        </div>
+      </div>
+    </div>
+    <div id="demand-log" class="panel">
+      <div class="card">
+        <div class="card-ttl"><span class="dot"></span>Approval Log — track Meta outcomes</div>
+        <p style="font-size:12px;color:var(--mu);margin-bottom:1rem">After submitting to Meta, update the status here. Over time this shows which reframing strategies get approved most.</p>
+        <div id="d-log-list"><div class="empty"><div class="ei">📭</div>No templates saved yet. Generate one and hit "Save to Approval Log".</div></div>
+        <div class="btn-row" style="margin-top:1rem">
+          <button class="btn btn-secondary btn-sm" onclick="exportLog('demand')">⬇️ Export Log as Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+
+<div id="chrome-warning" style="display:none;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 16px;margin:1rem 1.5rem 0;font-size:13px;line-height:1.6">
+  ⚠️ <strong>You're opening this in Chrome from your desktop — API calls will be blocked.</strong><br>
+  Chrome prevents local HTML files from calling external APIs. <strong>Open this file in Firefox instead</strong> — drag the file into Firefox and it will work perfectly.
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Show Chrome file:// warning immediately
+if(location.protocol === 'file:' && navigator.userAgent.indexOf('Firefox') === -1) {
+  document.getElementById('chrome-warning').style.display = 'block';
+}
+
+// ════════════════════════════════════════════════════════════
+//  CONFIG — Claude Sonnet 4.6 (Anthropic)
+//  API docs: https://docs.anthropic.com/en/api/messages
+//  Get key:  https://console.anthropic.com/
+// ════════════════════════════════════════════════════════════
+const CLAUDE_MODEL    = 'claude-sonnet-4-6';
+// Browsers cannot call api.anthropic.com directly (CORS blocked).
+// corsproxy.io acts as a relay — forwards all headers including x-api-key to Anthropic.
+const CLAUDE_ENDPOINT = 'https://corsproxy.io/?url=https://api.anthropic.com/v1/messages';
+
+let API_KEY = '';
+const logs = { demand:[], supply:[] };
+const bulk = { demand:[], supply:[] };
+const last = { demand:null, supply:null };
+
+// ════════════════════════════════════════════════════════════
+//  API KEY MANAGEMENT
+// ════════════════════════════════════════════════════════════
+function saveKey(){
+  var val = document.getElementById('api-key-input').value.trim();
+  if(!val.startsWith('sk-ant-')){
+    alert('Please paste a valid Claude API key.\nIt should start with "sk-ant-..."\n\nGet one at:\nhttps://console.anthropic.com/');
+    return;
+  }
+  API_KEY = val;
+  document.getElementById('api-key-input').value = '\u2022'.repeat(40);
+  document.getElementById('api-key-input').disabled = true;
+  document.getElementById('connect-btn').classList.add('hidden');
+  document.getElementById('disconnect-btn').classList.remove('hidden');
+  document.getElementById('api-status').classList.remove('hidden');
+  document.getElementById('api-banner').classList.add('connected');
+  document.getElementById('api-heading').textContent = 'Claude API Key connected \u2713';
+  toast('Connected \u2705  Ready to generate!');
+}
+function clearKey(){
+  API_KEY = '';
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('api-key-input').disabled = false;
+  document.getElementById('connect-btn').classList.remove('hidden');
+  document.getElementById('disconnect-btn').classList.add('hidden');
+  document.getElementById('api-status').classList.add('hidden');
+  document.getElementById('api-banner').classList.remove('connected');
+  document.getElementById('api-heading').textContent = 'Connect your Claude API Key';
+  toast('Disconnected');
+}
+
+// ════════════════════════════════════════════════════════════
+//  SPINNY APPROVED EXAMPLES
+//  Source: https://docs.google.com/spreadsheets/d/1jZfvZ-NySW5afPlxMg1kA3jrluiR1JF9A362QaV36uo
+//  All 5 rows read directly from the sheet — baked into prompt
+// ════════════════════════════════════════════════════════════
+var APPROVED_EXAMPLES = `
+SPINNY'S 5 META-APPROVED EXAMPLES — study these patterns exactly:
+
+[EXAMPLE 1] LOB: Demand | Theme: Sale
+ORIGINAL: "Hi [name], Exclusive Rs.20,000 OFF for you! The Kia Sonet you viewed is available at an offer price of {price} along with loans starting @10.99%. Click here to book it before midnight: Thank you for trusting Spinny"
+TEMPLATE NAME: demand_pro_sale_event1_11apr26
+TEMPLATE BODY: "*Hi {{1}}* The {{2}} is available {{3}} Click here to {{4}} Thank you for trusting Spinny"
+SAMPLE CONTENT APPROVED: "Hi USER_1818, The Spinny order (Ref_id: #30483248) is available for delivery. It will be delivered on 12/04/2026. Click here to track your order: www.spinny.com Thank you for trusting Spinny"
+WHAT CHANGED: "available at an offer price" -> "available for delivery" | "book it before midnight" -> "track your order" | Sign-off kept IDENTICAL
+KEY HOOK: Order available for delivery (delivery status notification)
+
+[EXAMPLE 2] LOB: Demand | Theme: Sale
+ORIGINAL: "Pay less on booking {make_model} today! The price of your preferred car has changed. You can now pay Rs.20,000 less and complete its purchase at loans @10.99%*. Click here: -Spinny"
+TEMPLATE NAME: demand_pro_sale_event2_10apr26
+TEMPLATE BODY: "*{{1}} today!* The {{2}} has changed. You can {{3}} Click here: {{4}} -Spinny"
+SAMPLE CONTENT APPROVED: "Your car delivery is scheduled for today! The delivery schedule for your Mahindra Thar has changed. You can check the updated delivery timeline. Click here: www.spinny.com -Spinny"
+WHAT CHANGED: "Pay less on booking" -> "delivery is scheduled" | "price...has changed" -> "delivery schedule has changed" | "pay Rs.20,000 less...loans @10.99%" -> "check the updated delivery timeline" | Sign-off "-Spinny" kept IDENTICAL
+KEY HOOK: Delivery schedule changed (schedule update notification)
+
+[EXAMPLE 3] LOB: Demand | Theme: Generic
+ORIGINAL: "Hi [name], good news! We just parked a new {Mahindra Thar} at your nearest Spinny hub. It is now available for a test drive. Click here to be the first one to book it. -Spinny"
+TEMPLATE NAME: demand_pro_dropped_leads_inventory1_7apr26
+TEMPLATE BODY: "*Hi {{1}}* We just parked {{2}} Click here to {{3}} -Spinny"
+SAMPLE CONTENT APPROVED: "Hi Mahima We just parked your 2022 Hyundai Verna for delivery on 8th Apr 2026 Click here to track: www.spinny.com -Spinny"
+WHAT CHANGED: "a new {car}" -> "your 2022 Hyundai Verna" (ownership personalised) | "available for a test drive" -> "for delivery on [date]" | "be the first one to book it" -> "track" | Sign-off "-Spinny" kept IDENTICAL
+KEY HOOK: Car parked for delivery (delivery ready notification)
+
+[EXAMPLE 4] LOB: Supply | Theme: Sale
+ORIGINAL: "There's a new top offer for your car till 27th Mar! Hi [name], sell your {2019 Hyundai Verna} with our Navratri offer and get upto Rs.20,000 on its current value. Click here to check the current price. -SellRight by Spinny"
+TEMPLATE NAME: supply_pro_fy_end_sale_live_22march26
+TEMPLATE BODY: "{{1}} Hi {{2}} current value. Click here to {{3}} -SellRight by Spinny"
+SAMPLE CONTENT APPROVED: "Transaction Status Notification | Ref ID: SR-447123 Hi Yuvraaj, your 2020 Honda City handover documentation has been processed and updated at its current value. Click here to track your vehicle transaction status -SellRight by Spinny"
+WHAT CHANGED: "new top offer...till 27th Mar" -> "Transaction Status Notification | Ref ID: SR-447123" | "Navratri offer and get upto Rs.20,000" -> "handover documentation has been processed" | "check the current price" -> "track your vehicle transaction status" | Sign-off "-SellRight by Spinny" kept IDENTICAL
+KEY HOOK: Handover documentation processed (document/transaction status)
+
+[EXAMPLE 5] LOB: Supply | Theme: Generic
+ORIGINAL: "{2022 Jeep Compass} valuation on {date}! Hi {name}, the valuation of your luxury {Jeep Compass} has been updated to its highest resale price. Click here to view the final price."
+TEMPLATE NAME: supply_pro_generic_2_18nov25
+TEMPLATE BODY: "{{1}} valuation on {{2}}! Hi {{3}}, the valuation of your {{4}}. Click here to view {{5}}"
+SAMPLE CONTENT APPROVED: "Account: #AE23874SP's valuation on 30th November 2025! Hi Sabhya, the valuation of your account #AE23874SP has been verified via PAN No: XXXXXXXX78S.. Click here to view full details."
+WHAT CHANGED: "luxury Jeep Compass" -> "account #AE23874SP" | "updated to its highest resale price" -> "verified via PAN No" (reframed as KYC/document verification) | "final price" -> "full details" | No sign-off in original — none added
+KEY HOOK: Account valuation verified via PAN (KYC/identity verification)
+
+[EXAMPLE 6] LOB: Demand | Theme: Service / Doorstep
+ORIGINAL: "*Showroom Shine at Your Door in 1 Hour!* 🚘 Doorstep deep cleaning & premium wax by *Spinny Pro* — spotless inside & out from *₹799* onwards. Click below to complete booking your service."
+TEMPLATE NAME: demand_pro_doorstep_service_apr26
+TEMPLATE BODY: "*{{1}}* 🚘 Your {{2}} by *Spinny Pro* — {{3}}. Click below to {{4}}."
+SAMPLE CONTENT APPROVED: "Service Appointment Confirmation | Ref ID: #SP-PRO-882145 🚘 Your Doorstep Service Request by Spinny Pro — scheduled and technician assigned for 15/04/2026. Click below to view your service details and track technician arrival: www.spinny.com."
+WHAT CHANGED: "Showroom Shine at Your Door in 1 Hour!" -> "Service Appointment Confirmation | Ref ID: #SP-PRO-882145" (fully promotional headline -> ref ID; standalone headline on its own line justifies a header variable) | "Doorstep deep cleaning & premium wax" -> "Doorstep Service Request" | "spotless inside & out from ₹799 onwards" -> "scheduled and technician assigned for 15/04/2026" | "complete booking your service" -> "view your service details and track technician arrival: www.spinny.com" | No sign-off in original — none added
+KEY HOOK: Service appointment confirmed with technician assigned (service/appointment status notification)
+
+[EXAMPLE 7] LOB: Demand | Theme: Inventory Match / Preference
+ORIGINAL: "Hey {name}, new car option added! Based on your preferences, we have added {car} to our inventory! Click and be the first one to take a test drive: {link} -Spinny"
+TEMPLATE NAME: demand_pro_inventory_match_apr26
+TEMPLATE BODY: "*Hey {{1}}* Based on your preferences, {{2}} Click {{3}} -Spinny"
+SAMPLE CONTENT APPROVED: "Hey Mahima Based on your preferences, we have scheduled your Toyota Corolla 2020 to be delivered on your address - Capital Business Park, Gurgaon. On 30th May 2025. Click to track status - www.spinny.com -Spinny"
+WHAT CHANGED: "new car option added!" -> dropped into greeting line wrapper (merged with Hi {{1}} since it was short promotional phrase after the name) | "we have added {car} to our inventory" -> "we have scheduled your Toyota Corolla 2020 to be delivered on your address - Capital Business Park, Gurgaon. On 30th May 2025." (inventory addition -> delivery scheduling with address) | "be the first one to take a test drive: {link}" -> "track status - www.spinny.com" | Sign-off "-Spinny" kept IDENTICAL
+KEY HOOK: Delivery scheduled to customer's registered address (delivery tracking notification)
+
+[EXAMPLE 8] LOB: Demand | Theme: Inventory Match / Car Added
+ORIGINAL: "New 2022 Mahindra Thar | Petrol Added 🙁 Hey Mahima, a Thar matching your interest has just been added. 200-points inspected and backed by our 5-Day Money Back Guarantee. Tap and be the first to book it → {link}"
+TEMPLATE NAME: demand_pro_dropped_leads_inventory2_apr26
+TEMPLATE BODY: "*{{1}}* Hey {{2}} 200-points inspected and backed by our 5-Day Money Back Guarantee. Tap {{3}}"
+SAMPLE CONTENT APPROVED: "Delivery ID: 234 Hey Mahima 200-points inspected and backed by our 5-Day Money Back Guarantee. Tap to track delivery: www.spinny.com"
+WHAT CHANGED: "New 2022 Mahindra Thar | Petrol Added" -> "Delivery ID: 234" (new inventory headline -> delivery reference ID; fully promotional standalone headline justifies header variable) | "a Thar matching your interest has just been added" -> trimmed out (entire descriptive clause removed; name-only kept in {{2}}) | "be the first to book it → {link}" -> "track delivery: www.spinny.com" | No sign-off in original — none added
+KEY HOOK: Delivery ID assigned and 5-day money-back guarantee mentioned as a post-purchase/handover notification
+
+[EXAMPLE 9] LOB: Supply | Theme: Exchange / Upgrade
+ORIGINAL: "Thinking about a car upgrade?\nSell your {Hyundai i20} to Spinny for the Best Price.\nUnlock an exchange bonus of upto ₹20,000 for your next car purchase with Spinny.\nClick here if you're interested: {link}"
+TEMPLATE NAME: supply_pro_exchange_upgrade_apr26
+TEMPLATE BODY: "{{1}}\n{{2}} to Spinny for the {{3}}.\nUnlock {{4}} for your next car {{5}} with Spinny.\nClick here {{6}}"
+SAMPLE CONTENT APPROVED: "Vehicle Exchange Status Update\nYour Hyundai i20 documentation has been processed to Spinny for the current market value.\nUnlock your verified transaction details for your next car handover with Spinny.\nClick here to track your exchange status: www.spinny.com"
+WHAT CHANGED: "Thinking about a car upgrade?" -> "Vehicle Exchange Status Update" (question/teaser headline -> status notification header; entire standalone line is promotional so becomes {{1}}) | "Sell your {Hyundai i20}" -> {{2}} = "Your Hyundai i20 documentation has been processed" (the verb "Sell your" is a commercial action — it is wrapped WITH the car model, not left as static text) | "Best Price" -> {{3}} = "current market value" (promotional superlative wrapped) | "an exchange bonus of upto ₹20,000" -> {{4}} = "your verified transaction details" (offer amount wrapped) | "purchase" -> {{5}} = "handover" (banned word wrapped; single word variable is acceptable here since "purchase" is a banned word that cannot stay as static text) | "if you're interested: {link}" -> {{6}} = "to track your exchange status: www.spinny.com" (soft-sell conditional phrase + link wrapped together — "if you're interested" is promotional intent language and must not remain as static text)
+KEY HOOK: Vehicle exchange documentation processed — transaction status notification
+CRITICAL LESSON: "Sell your", "Buy your", "Book your" at the start of a line are commercial action verbs — wrap them WITH whatever follows (car model, item), do not leave them as static text. "if you're interested", "to book it", "to explore", "to grab" in CTAs are soft-sell qualifiers — wrap them WITH the link into one CTA variable.
+`;
+
+// ════════════════════════════════════════════════════════════
+//  LIVE SHEET INTEL — fetched from Google Sheet at startup
+//  Reads Status column: learns from APPROVED, avoids REJECTED
+// ════════════════════════════════════════════════════════════
+var SHEET_INTEL = '';
+
+function parseCSV(text) {
+  var rows = [];
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var cols = [];
+    var cur = '';
+    var inQ = false;
+    for (var j = 0; j < line.length; j++) {
+      var ch = line[j];
+      if (ch === '"') {
+        if (inQ && line[j+1] === '"') { cur += '"'; j++; }
+        else { inQ = !inQ; }
+      } else if (ch === ',' && !inQ) {
+        cols.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+var GAS_URL = '';
+var GUIDELINES_URL = 'https://script.google.com/macros/s/AKfycbyTeKQ8I-yyu1I8ZMTdhWRlEyi8rP1BMUSrreTqcqKUUn8TeENfpxlPYgAA_ZV8uZSA/exec';
+var EXTRA_GUIDELINES = ''; // loaded once on page ready
+
+function saveGasUrl() {
+  var val = document.getElementById('gas-url-input').value.trim();
+  if (!val.startsWith('https://script.google.com/macros/s/')) {
+    alert('Please paste a valid Apps Script web app URL.\nIt should start with:\nhttps://script.google.com/macros/s/');
+    return;
+  }
+  GAS_URL = val;
+  document.getElementById('gas-url-input').value = val.slice(0,40) + '…';
+  document.getElementById('gas-url-input').disabled = true;
+  document.getElementById('gas-connect-btn').classList.add('hidden');
+  document.getElementById('gas-disconnect-btn').classList.remove('hidden');
+  document.getElementById('gas-status').classList.remove('hidden');
+  document.getElementById('gas-banner').classList.add('connected');
+  document.getElementById('gas-heading').textContent = 'Apps Script connected ✓';
+  loadSheetIntel();
+}
+
+function clearGasUrl() {
+  GAS_URL = '';
+  document.getElementById('gas-url-input').value = '';
+  document.getElementById('gas-url-input').disabled = false;
+  document.getElementById('gas-connect-btn').classList.remove('hidden');
+  document.getElementById('gas-disconnect-btn').classList.add('hidden');
+  document.getElementById('gas-status').classList.add('hidden');
+  document.getElementById('gas-banner').classList.remove('connected');
+  document.getElementById('gas-heading').textContent = 'Connect Google Apps Script URL';
+  document.getElementById('sheet-status').textContent = 'Disconnected — paste Apps Script URL to reconnect.';
+  SHEET_INTEL = '';
+}
+
+async function loadGuidelines() {
+  try {
+    var res = await fetch(GUIDELINES_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var rows = await res.json();
+    if (!Array.isArray(rows) || rows.length < 2) throw new Error('Guidelines sheet empty');
+
+    // Find Prompt column (header row)
+    var headers = rows[0].map(function(h){ return (h||'').toLowerCase().trim(); });
+    var promptCol = headers.findIndex(function(h){ return h.indexOf('prompt') > -1; });
+    if (promptCol === -1) throw new Error('No "Prompt" column found in guidelines sheet');
+
+    // Concatenate all prompt rows in order
+    var lines = [];
+    for (var i = 1; i < rows.length; i++) {
+      var val = (rows[i][promptCol] || '').trim();
+      if (val) lines.push(val);
+    }
+    EXTRA_GUIDELINES = lines.join('\n');
+    console.log('[WA Template Studio] Guidelines loaded — ' + lines.length + ' rules from sheet');
+  } catch(err) {
+    EXTRA_GUIDELINES = '';
+    console.warn('[WA Template Studio] Guidelines sheet failed to load:', err.message);
+  }
+}
+
+async function loadSheetIntel() {
+  var statusEl = document.getElementById('sheet-status');
+  if (!GAS_URL) {
+    statusEl.textContent = 'Paste your Apps Script URL above to load live sheet data.';
+    return;
+  }
+  statusEl.textContent = 'Loading sheet data…';
+  try {
+    var res = await fetch(GAS_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var allRows = await res.json();
+    if (!Array.isArray(allRows) || allRows.length < 2) throw new Error('Sheet appears empty');
+
+    var headers = allRows[0].map(function(h){ return (h||'').toLowerCase().replace(/\s+/g,'_'); });
+    var col = function(name) {
+      return headers.findIndex(function(h){ return h.indexOf(name) > -1; });
+    };
+
+    var iStatus = col('status');
+    var iName   = col('template_name') > -1 ? col('template_name') : col('name');
+    var iSample = col('sample_content') > -1 ? col('sample_content') : col('sample');
+    var iBody   = col('template_body')  > -1 ? col('template_body')  : col('body');
+    var iVars   = col('variable')       > -1 ? col('variable')       : col('vars');
+    var iNotes  = col('note')           > -1 ? col('note')           : col('reason');
+    var iLob    = col('lob')            > -1 ? col('lob')            : col('line_of_business');
+
+    if (iStatus === -1) throw new Error('No "Status" column found in sheet');
+
+    var dataRows = allRows.slice(1);
+    console.log('[WA Template Studio] Sheet connected — total data rows: ' + dataRows.length);
+
+    var approved = [], rejected = [];
+    dataRows.forEach(function(r) {
+      if (!r || r.length < 2) return;
+      var status = (r[iStatus] || '').toLowerCase().trim();
+      var entry  = {
+        name:   iName   > -1 ? (r[iName]   || '') : '',
+        sample: iSample > -1 ? (r[iSample] || '') : '',
+        body:   iBody   > -1 ? (r[iBody]   || '') : '',
+        vars:   iVars   > -1 ? (r[iVars]   || '') : '',
+        notes:  iNotes  > -1 ? (r[iNotes]  || '') : '',
+        lob:    iLob    > -1 ? (r[iLob]    || '') : ''
+      };
+      if (!entry.sample && !entry.body && !entry.name) return;
+      if (status.indexOf('approv') > -1 || status.indexOf('success') > -1 || status.indexOf('pass') > -1) approved.push(entry);
+      else if (status.indexOf('reject') > -1 || status.indexOf('fail') > -1 || status.indexOf('denied') > -1 || status.indexOf('error') > -1) rejected.push(entry);
+    });
+
+    console.log('[WA Template Studio] Approved: ' + approved.length + ' | Rejected: ' + rejected.length);
+
+    var intel = '';
+    if (approved.length > 0) {
+      intel += '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      intel += 'APPROVED BY META — LEARN THE TRANSACTIONAL VARIABLE VALUE STYLE\n';
+      intel += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      intel += 'These templates were approved under UTILITY category. Study the sample content carefully — the variable values are purely transactional. This is the exact style your variable values must match.\n\n';
+      approved.forEach(function(e, idx) {
+        intel += '[META APPROVED #' + (idx+1) + ']' + (e.lob ? ' LOB: ' + e.lob : '') + '\n';
+        if (e.name)   intel += 'Template Name: ' + e.name + '\n';
+        if (e.body)   intel += 'Template Body: ' + e.body + '\n';
+        if (e.sample) intel += 'Sample Content (utility-approved — study how variable values are purely transactional): ' + e.sample + '\n';
+        if (e.vars)   intel += 'Variable Values Used: ' + e.vars + '\n';
+        if (e.notes)  intel += 'Notes: ' + e.notes + '\n';
+        intel += '\n';
+      });
+    }
+    if (rejected.length > 0) {
+      intel += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      intel += '⛔ REJECTED BY META — EXACT PATTERNS THAT TRIGGERED MARKETING CLASSIFICATION\n';
+      intel += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      intel += 'These templates were rejected. The sample content or variable values contained promotional patterns. Identify exactly what triggered rejection — and never reproduce those patterns.\n\n';
+      rejected.forEach(function(e, idx) {
+        intel += '[META REJECTED #' + (idx+1) + ']' + (e.lob ? ' LOB: ' + e.lob : '') + '\n';
+        if (e.name)   intel += 'Template Name: ' + e.name + '\n';
+        if (e.body)   intel += 'Template Body: ' + e.body + '\n';
+        if (e.sample) intel += 'Sample Content (REJECTED — identify what made this promotional): ' + e.sample + '\n';
+        if (e.vars)   intel += 'Variable Values (REJECTED): ' + e.vars + '\n';
+        if (e.notes)  intel += 'Rejection reason: ' + e.notes + '\n';
+        intel += 'LESSON: What specific word, phrase, or value in the sample content above triggered marketing classification? Never use that pattern.\n\n';
+      });
+    }
+
+    SHEET_INTEL = intel;
+
+    var total = approved.length + rejected.length;
+    if (total === 0) {
+      statusEl.innerHTML = 'Sheet connected ✓ — no Approved/Rejected rows yet. Update the Status column to improve AI accuracy.';
+      document.getElementById('sheet-strip').style.background = '#f0fdf4';
+    } else {
+      var msg = '9 hardcoded examples + live sheet: ';
+      msg += '<span style="color:#15803d;font-weight:600">✅ ' + approved.length + ' approved patterns learned</span>';
+      if (rejected.length > 0) msg += ' &nbsp;·&nbsp; <span style="color:#b91c1c;font-weight:600">⛔ ' + rejected.length + ' rejection mistakes loaded</span>';
+      msg += ' — AI will replicate successes and avoid past errors.';
+      statusEl.innerHTML = msg;
+      document.getElementById('sheet-strip').style.borderColor = '#86efac';
+    }
+
+  } catch(err) {
+    SHEET_INTEL = '';
+    statusEl.innerHTML = '9 hardcoded examples active &nbsp;·&nbsp; <span style="color:#92400e">Sheet error: ' + err.message + '</span>';
+    document.getElementById('sheet-strip').style.background = '#fffbeb';
+    console.error('[WA Template Studio] Sheet load failed:', err.message);
+  }
+}
+
+// Load guidelines + sheet intel on page ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function(){ loadGuidelines(); loadSheetIntel(); });
+} else {
+  loadGuidelines();
+  loadSheetIntel();
+}
+
+// ════════════════════════════════════════════════════════════
+//  PROMPT BUILDER
+// ════════════════════════════════════════════════════════════
+function buildPrompt(lob, copy, intent){
+  var intentLine = intent ? '\nINTENT: ' + intent : '';
+  var p = '';
+  // Inject external guidelines first so they frame everything that follows
+  if (EXTRA_GUIDELINES) {
+    p += '██████████████████████████████████████████\n';
+    p += '  SPINNY COMPLIANCE GUIDELINES — READ BEFORE ANYTHING ELSE\n';
+    p += '██████████████████████████████████████████\n';
+    p += 'The following guidelines are mandatory. They define how Meta evaluates utility templates for Spinny. Every rule below overrides any general assumption you might have. Read fully before processing the copy.\n\n';
+    p += EXTRA_GUIDELINES;
+    p += '\n\n';
+  }
+  p += 'You are a WhatsApp Business API template expert for Spinny, an Indian used-car marketplace.\n\n';
+  p += 'LINE OF BUSINESS: ' + lob.toUpperCase() + intentLine + '\n\n';
+  p += 'PROMOTIONAL COPY:\n"""\n' + copy + '\n"""\n\n';
+  p += 'YOUR JOB:\n';
+  p += 'Convert this into a Meta UTILITY category template using Spinny\'s proven playbook.\n\n';
+  p += 'SPINNY\'S EXACT PLAYBOOK — follow this precisely:\n';
+  p += '- DO NOT rewrite, rephrase, or restructure any sentence in the copy.\n';
+  p += '- DO NOT add any new words, sentences, headers, or ref IDs that are not in the original.\n';
+  p += '- DO NOT remove any sentence. Keep every sentence, even if it has no promotional words.\n';
+  p += '- ONLY wrap promotional words/phrases in {{1}}, {{2}}, etc. Everything else stays exactly as written.\n';
+  p += '- There are NO exceptions. NEVER rewrite, replace, or rephrase any word. Promotional words are handled ONLY by wrapping them as {{variables}}. See PROMOTIONAL WORD HANDLING below.\n\n';
+
+  p += '██████████████████████████████████████████\n';
+  p += '  THE #1 RULE — VERBATIM STATIC TEXT\n';
+  p += '██████████████████████████████████████████\n';
+  p += 'Every word in the original copy that is NOT wrapped in a {{variable}} MUST appear in the template_body exactly as written — same word, same order, same sentence structure.\n\n';
+  p += 'You are NOT a copywriter. You are a wrapper. Your only job is to identify which words are dynamic and wrap them. The rest must be copied verbatim.\n\n';
+  p += '⛔ REAL FAILURE EXAMPLE (from production):\n';
+  p += '  Original line: "Sell your [Hyundai i20] to Spinny for the Best Price."\n';
+  p += '  WRONG output:  "The valuation for your {{2}} has been updated based on recent market data."\n';
+  p += '  → This is a COMPLETE REWRITE. The words "Sell your", "to Spinny for the Best Price" were in the original but are gone. New words "The valuation for your", "has been updated based on recent market data" were invented. THIS IS FORBIDDEN.\n\n';
+  p += '  Original line: "Unlock an exchange bonus of upto ₹20,000 for your next car purchase with Spinny."\n';
+  p += '  WRONG output:  "Your account documentation has been verified for the next step."\n';
+  p += '  → Every single word was replaced. FORBIDDEN.\n\n';
+  p += '  Original line: "Click here if you\'re interested: [link]"\n';
+  p += '  WRONG output:  "Click here to view the updated valuation: {{3}}"\n';
+  p += '  → "if you\'re interested" was replaced with "to view the updated valuation". FORBIDDEN.\n\n';
+  p += '  CORRECT output for the same copy:\n';
+  p += '  Original: "Sell your [Hyundai i20] to Spinny for the Best Price."\n';
+  p += '  CORRECT:  "{{2}} to Spinny for the {{3}}."  ← "Sell your [Hyundai i20]" is wrapped as {{2}} (commercial verb + car model = one promotional unit). "Best Price" is wrapped as {{3}}. "to Spinny for the" stays verbatim.\n\n';
+  p += '  Original: "Unlock an exchange bonus of upto ₹20,000 for your next car purchase with Spinny."\n';
+  p += '  CORRECT:  "Unlock {{4}} for your next car {{5}} with Spinny."  ← "an exchange bonus of upto ₹20,000" wrapped as {{4}}. "purchase" wrapped as {{5}} (banned word). All other words verbatim.\n\n';
+  p += '  Original: "Click here if you\'re interested: [link]"\n';
+  p += '  CORRECT:  "Click here {{6}}"  ← "if you\'re interested: [link]" wrapped as {{6}} (soft-sell qualifier + link = one promotional unit). "Click here" stays verbatim.\n\n';
+  p += 'SELF-TEST before writing template_body: For every static word in your output, ask "Is this word in the original copy?" If the answer is NO — delete it. You cannot invent static words.\n\n';
+
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'LINE PRESERVATION — THE MOST IMPORTANT RULE\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'Before writing anything, count the number of lines/sentences in the original copy.\n';
+  p += 'Your template_body MUST contain the EXACT same number of lines in the EXACT same order.\n';
+  p += 'If the original has 4 lines, the output must have 4 lines. If it has 6, the output must have 6.\n';
+  p += 'DROPPING, MERGING, or SKIPPING any line is a critical failure — even if a line contains only promotional content.\n';
+  p += 'A line that is entirely promotional becomes a single {{variable}} on its own line — it is NEVER deleted.\n\n';
+  p += 'VERIFY BEFORE OUTPUT: Count original lines → count your template_body lines → they must match.\n\n';
+  p += 'EXAMPLE of correct line preservation:\n';
+  p += '  Original (4 lines):\n';
+  p += '    Line 1: "Hurry! Claim your discount."\n';
+  p += '    Line 2: "Own your favourite Mahindra Thar at the newly updated price of ₹2,00,000"\n';
+  p += '    Line 3: "View the offer and confirm your purchase: link"\n';
+  p += '    Line 4: "-Spinny"\n\n';
+  p += '  Correct template_body (4 lines — nothing dropped):\n';
+  p += '    Line 1: "{{1}}"  ← entire line is promotional, becomes one variable\n';
+  p += '    Line 2: "Own your favourite {{2}} at the newly updated price of {{3}}"\n';
+  p += '    Line 3: "View the {{4}} and {{5}}: {{6}}"  ← or wrapped as needed\n';
+  p += '    Line 4: "-Spinny"\n\n';
+  p += '  WRONG (lines dropped — NEVER do this):\n';
+  p += '    "{{1}}"\n';
+  p += '    "View the {{2}}: {{3}}"\n';
+  p += '    "-Spinny"\n';
+  p += '    ← Lines 2 and 3 from original were merged/dropped. THIS IS FORBIDDEN.\n\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'PROMOTIONAL WORD HANDLING — WRAP, NEVER REWRITE\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'THE ABSOLUTE RULE: You are NEVER allowed to change, replace, rephrase, or rewrite ANY word from the original copy. Not in the body, not in the CTA, not anywhere.\n';
+  p += 'The ONLY tool you have is wrapping a span of words in a {{variable}}.\n\n';
+  p += 'PROMOTIONAL WORDS that cannot remain as static text (must be wrapped inside a {{variable}}):\n';
+  p += '  book, booking, buy, purchase, grab, avail, claim,\n';
+  p += '  free, offer, deal, discount, save, cashback,\n';
+  p += '  explore, discover, browse, shortlist, wishlist,\n';
+  p += '  hurry, limited time, last chance, expires, deadline, before midnight, by tonight,\n';
+  p += '  exclusive, special, best price, lowest price, unbeatable,\n';
+  p += '  earn, win, reward, gift\n\n';
+  p += 'HOW TO HANDLE THEM:\n';
+  p += '  Identify the minimal phrase containing the promotional word. Wrap that whole phrase as {{n}}.\n';
+  p += '  Keep everything before and after that phrase exactly as written in the original.\n';
+  p += '  The sample value for that variable should be a realistic neutral dummy.\n\n';
+  p += 'WORKED EXAMPLES (study these carefully):\n\n';
+  p += '  EXAMPLE A — banned verb "book" in CTA:\n';
+  p += '    Original: "Click the button below to book your Doorstep Car Evaluation today & sell your car while it\'s still in demand."\n';
+  p += '    FORBIDDEN (rewrite): "Click the button below to view the updated details for your car evaluation." ← YOU CANNOT DO THIS\n';
+  p += '    FORBIDDEN (rewrite): "Click the button below to schedule your evaluation." ← YOU CANNOT DO THIS\n';
+  p += '    CORRECT (wrap): "Click the button below to {{3}}"\n';
+  p += '    Variable: {{3}} = cta_action → example: "schedule your Doorstep Car Evaluation today"\n';
+  p += '    → The words "Click the button below to" are preserved verbatim from the original.\n\n';
+  p += '  EXAMPLE B — promotional amount in body or CTA:\n';
+  p += '    Original: "Click to check if you\'re getting more than upto Rs 9 Lakh: [link]"\n';
+  p += '    CORRECT (wrap): "Click to check if you\'re getting more than {{4}}: [link]"\n';
+  p += '    Variable: {{4}} = valuation_amount → example: "Rs 7,50,000"\n\n';
+  p += '  EXAMPLE C — urgency phrase:\n';
+  p += '    Original: "Click here to book it before midnight: [link]"\n';
+  p += '    CORRECT (wrap): "Click here to {{3}}: [link]"\n';
+  p += '    Variable: {{3}} = cta_action → example: "complete your vehicle registration"\n\n';
+  p += '  EXAMPLE D — offer phrase in body:\n';
+  p += '    Original: "Exclusive Rs.20,000 OFF for you!"\n';
+  p += '    CORRECT (wrap): "{{2}}"\n';
+  p += '    Variable: {{2}} = offer_detail → example: "Your account update is ready for review"\n\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+
+  p += 'NO INVENTED HEADERS RULE (critical):\n';
+  p += '- NEVER add a header line or reference ID (like "Account Update Notification | Ref ID: SR-XXXXXX") unless the original copy ALREADY contains a header or reference identifier at the top.\n';
+  p += '- The ref ID pattern seen in Example 4 exists ONLY because Example 4\'s original had a promotional headline ("There\'s a new top offer…") that needed converting to a transactional one. Do NOT replicate that pattern unless your input copy also starts with a promotional headline that must be converted.\n';
+  p += '- A standalone {{1}} on its own line with nothing else is ONLY acceptable if the original copy\'s first line was also a standalone dynamic value (like a car model name alone). Otherwise, the first {{n}} must sit inside a sentence with static words around it.\n\n';
+
+  p += 'VARIABLE-TO-TEXT RATIO RULE (critical for Meta approval):\n';
+  p += '- At least 60% of all words in the template body must be static text.\n';
+  p += '- PER-LINE MINIMUM: Every line that contains a variable MUST also contain at least 5 static words on that same line. A line with only 1-3 static words around a variable means you have over-wrapped — the variable is swallowing content that should stay as static text.\n';
+  p += '- TOTAL WORD COUNT CHECK: Before outputting, count all words in your template_body. If static word count < 15 across the whole template, you have failed — go back and unwrap variables.\n';
+  p += '- If you count 4 or more variables total, stop and re-evaluate. Each variable must be justified by a specific dynamic data field (name, car model, date, price, link). Generic descriptive phrases are NOT variables.\n\n';
+  p += '⛔ HARDCODED ANTI-PATTERN #3 — Skeleton template. This is the worst failure mode.\n';
+  p += '  A skeleton template has 3-4 variables but barely any static text — each line is just a variable with 1-3 words around it.\n';
+  p += '  WRONG output (real failure seen in production):\n';
+  p += '    {{1}}\n';
+  p += '    Sell your {{2}} .\n';
+  p += '    Unlock {{3}} with Spinny.\n';
+  p += '    Click here {{4}}\n';
+  p += '  WHY IT IS WRONG: Only ~7 static words total across 4 lines. Lines 2-4 each have 2-3 static words only. Meta will reject this — it reads like a template shell with no real message.\n';
+  p += '  HOW TO FIX: Ask yourself what the original copy was actually saying. Keep the descriptive sentences as static text. Only the truly dynamic values (name, car model, specific price, specific date, link) become variables.\n';
+  p += '  CORRECT version of the same message:\n';
+  p += '    {{1}}\n';
+  p += '    You can now sell your {{2}} with Spinny at the best market price.\n';
+  p += '    Your documentation has been verified and your account is ready for the next step.\n';
+  p += '    Click here to track your transaction status: www.spinny.com\n';
+  p += '  → Static words: 30+. Variables: 2. Every line tells the user something.\n\n';
+  p += '- BAD: "{{1}}\\nSell your {{2}}.\\nUnlock {{3}} with Spinny.\\nClick here {{4}}"  ← skeleton, ~7 static words, WRONG\n';
+  p += '- GOOD: "Hi {{1}}, your Hyundai Verna\'s value just got updated.\\nBased on current market demand, we have recalculated the price of your car.\\nClick here to check the updated valuation: www.spinny.com\\n-SellRight by Spinny"  ← 2 vars, 30+ static words, every line has a real sentence\n\n';
+
+  p += 'VARIABLE CHUNKING RULE (critical):\n';
+  p += '- Scan each line independently.\n';
+  p += '- If a line has ONE contiguous block of promotional content, use ONE variable for the whole block.\n';
+  p += '- If a line has TWO separate promotional chunks separated by static words, use TWO variables — BUT ONLY if the separating static text is a meaningful phrase (5+ words). Short connectors like ":", "a", "an", "in", "the", "of", "at", "and", "or", "to" between two chunks do NOT justify two variables — merge them into one.\n';
+  p += '- MERGE RULE: If two candidate variables on the same line are separated only by punctuation (: ; , . -) or short connector words (a, an, the, in, of, at, and, or, to, for, with, by, is, are, was), merge the entire span into ONE variable.\n';
+  p += '- SEPARATOR TEST: Before creating two variables on the same line, count the static words between them. If there are 4 or fewer static words between the two variables, MERGE them into one.\n';
+  p += '⛔ HARDCODED ANTI-PATTERN #1 — "Hi {{2}}, {{3}}" is ALWAYS WRONG. No exceptions.\n';
+  p += '  WRONG:   Hi {{2}}, {{3}}   → the name and what follows are ONE variable\n';
+  p += '  CORRECT: Hi {{2}}          → {{2}} sample = "Rahul, your Toyota Corolla delivery is scheduled for 30th May"\n\n';
+  p += '⛔ HARDCODED ANTI-PATTERN #2 — "{{n}}: {{n+1}}" is ALWAYS WRONG when the colon is the only separator.\n';
+  p += '  This is the CTA colon-link pattern. The model repeatedly produces "...of {{3}}: {{4}}" where {{3}} is a car/item and {{4}} is a link.\n';
+  p += '  WRONG:   Tap to check the updated price of {{3}}: {{4}}\n';
+  p += '  WRONG:   Click here to view {{3}}: {{4}}\n';
+  p += '  WRONG:   View the {{3}}: {{4}}\n';
+  p += '  The fix: absorb the link into the preceding variable OR keep the link as a standalone static URL.\n';
+  p += '  CORRECT option A: "Tap to check the updated price of {{3}}"  ← {{3}} = "your 2019 Hyundai Verna: www.spinny.com/car-hub/12345"\n';
+  p += '  CORRECT option B: "Tap to check the updated price of {{3}}: www.spinny.com"  ← link is static, not a variable\n';
+  p += '  NEVER give the car/item and the link as two separate variables on the same line.\n\n';
+  p += '- CRITICAL EXAMPLES of what must be merged into ONE variable:\n';
+  p += '    "Hi {{2}}, {{3}}."        ← comma only → WRONG. Must be: "Hi {{2}}"\n';
+  p += '    "Hi {{2}} {{3}}."         ← space only → WRONG. Must be: "Hi {{2}}"\n';
+  p += '    "{{2}} at {{3}}"          ← "at" only → WRONG. Must be: "{{2}}"\n';
+  p += '    "{{2}} in {{3}}"          ← "in" only → WRONG. Must be: "{{2}}"\n';
+  p += '    "{{2}} - {{3}}"           ← dash only → WRONG. Must be: "{{2}}"\n';
+  p += '    "{{2}}: {{3}}"            ← colon only → WRONG. Must be: "{{2}}"\n';
+  p += '    "price of {{3}}: {{4}}"   ← colon only → WRONG. Must be: "price of {{3}}" with link inside {{3}} or as static text\n';
+  p += '    "You can also {{4}}."     ← single variable, fine\n';
+  p += '- NEVER split a single contiguous promotional phrase into multiple variables on the same line.\n';
+  p += '- Personal names like [name] are always their own variable (e.g. {{1}}) since they are dynamic.\n';
+  p += '- Example of correct chunking: "Hi [name], your [Car Model] is worth [price] today"\n';
+  p += '  → "Hi {{1}}, your {{2}} today"   ← {{2}} covers "Car Model] is worth [price" as ONE chunk\n';
+  p += '  NOT → "Hi {{1}}, your {{2}} is worth {{3}} today"  ← WRONG, splits one chunk into two\n\n';
+
+  p += 'WHAT COUNTS AS PROMOTIONAL — wrap ONLY these as variables:\n';
+  p += '- Personal name/identifier: [name], [customer_name], Ref ID\n';
+  p += '- Specific car model + price: "Mahindra Thar", "₹12,34,990", "2019 Honda City"\n';
+  p += '- Sale/event names: "Sunday Sale", "Navratri offer"\n';
+  p += '- Discount/offer amounts: "₹2 Lakh OFF", "upto ₹20,000", "loans @10.99%"\n';
+  p += '- Urgency phrases: "by tonight", "before midnight", "till 27th Mar"\n';
+  p += '- City/location for targeting: "buyers in Delhi"\n';
+  p += '- A CTA action phrase that contains a banned word\n';
+  p += '- A URL/link placeholder\n';
+  p += '- COMMERCIAL ACTION VERBS at the start of a line: "Sell your", "Buy your", "Book your", "Grab your", "Claim your" — these are promotional even if not in the banned list. When a line starts with one of these verbs followed by a car model or item, wrap the ENTIRE phrase (verb + item) as ONE variable. Do NOT leave "Sell your" as static text.\n';
+  p += '  WRONG: "Sell your {{2}} to Spinny for the {{3}}"  ← "Sell your" left as static — WRONG\n';
+  p += '  CORRECT: "{{2}} to Spinny for the {{3}}"  ← {{2}} = "Sell your Hyundai i20" in original → sample = "Your Hyundai i20 documentation has been processed"\n';
+  p += '- CTA SOFT-SELL QUALIFIERS: "if you\'re interested", "to explore", "to grab", "to avail", "to book it", "to claim" — these are promotional intent phrases. When a CTA line ends with one of these qualifiers (with or without a link), wrap the qualifier + link together as ONE variable.\n';
+  p += '  WRONG: "Click here if you\'re interested: {{6}}"  ← "if you\'re interested" left as static — promotional intent, WRONG\n';
+  p += '  CORRECT: "Click here {{6}}"  ← {{6}} = "if you\'re interested: www.spinny.com" → sample = "to track your exchange status: www.spinny.com"\n\n';
+  p += 'WHAT MUST STAY AS STATIC TEXT — never wrap these as variables:\n';
+  p += '- Generic transactional statements: "your car handover process has been initiated", "your documentation has been verified", "your order is confirmed"\n';
+  p += '- Process descriptions: "The required documentation has been verified and is pending your final review"\n';
+  p += '- Instructional phrases: "Click here to", "You can also", "Please check"\n';
+  p += '- Brand sign-off: "-Spinny", "-SellRight by Spinny"\n';
+  p += '- Any sentence that has no promotional/personalised content in it\n\n';
+  p += 'RATIO RULE: For every variable in the template, there must be at least 6-8 words of static text. A template with 4+ variables and fewer than 20 static words is WRONG — reduce variables by keeping generic descriptive sentences as static text.\n\n';
+
+  p += 'WHAT IS SAFE — keep as exact static text (do not wrap in variables):\n';
+  p += '- Greeting structure: "Hi" (the word itself, not the name)\n';
+  p += '- CTA structural words that do NOT contain a banned word: "Click here for more details:", "Click here to track your order:", "Click the button below to" (when the action after it is wrapped as a variable)\n';
+  p += '- Structural phrases: "we have updated the price of your car", "Based on the interest of"\n';
+  p += '- Brand sign-off: "-Spinny", "-SellRight by Spinny"\n';
+  p += '- Emojis, punctuation, line breaks\n\n';
+
+  p += 'CORRECT WORKED EXAMPLE:\n';
+  p += 'Original:\n';
+  p += '"Hi [name], your Mahindra Thar is worth ₹XX,XX,990 today\n';
+  p += 'Based on the interest of buyers in Delhi, we have updated the price of your car.\n';
+  p += 'Click here for more details: {{link}}\n';
+  p += '-SellRight by Spinny"\n\n';
+  p += 'Correct template body:\n';
+  p += '"Hi {{1}}, your {{2}} today\n';
+  p += 'Based on the interest of buyers in {{3}}, we have updated the price of your car.\n';
+  p += 'Click here for more details: {{4}}\n';
+  p += '-SellRight by Spinny"\n\n';
+  p += 'Variables:\n';
+  p += '{{1}} = customer_name → "Sabhyajeet"\n';
+  p += '{{2}} = car_detail → "Mahindra Thar (Order #SP-2026-4821)"  ← car model + order ref = one chunk, one variable\n';
+  p += '{{3}} = city → "Delhi"\n';
+  p += '{{4}} = link → "www.spinny.com"\n\n';
+  p += 'Correct sample content (replace each {{n}} with its dummy value, ALL other text identical to template body):\n';
+  p += '"Hi Sabhyajeet, your Mahindra Thar (Order #SP-2026-4821) today\n';
+  p += 'Based on the interest of buyers in Delhi, we have updated the price of your car.\n';
+  p += 'Click here for more details: www.spinny.com\n';
+  p += '-SellRight by Spinny"\n\n';
+  p += 'WRONG sample content (do NOT do this — rewrites sentences):\n';
+  p += '"Hi Sabhyajeet, your Mahindra Thar handover documentation has been processed today\n';
+  p += 'Based on the status of your transaction in Delhi, we have updated the details of your car.\n';
+  p += '..." ← WRONG. Static sentences must be copied verbatim.\n\n';
+
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'VARIABLE VALUE RULES — THIS IS WHY TEMPLATES GET REJECTED\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'The variable "example" values you generate (shown to Meta as sample content) are the #1 reason templates get classified as MARKETING instead of UTILITY.\n\n';
+  p += '⛔ FORBIDDEN variable values — these will trigger marketing classification:\n';
+  p += '  - Offer amounts: "₹20,000 OFF", "upto ₹1 Lakh bonus", "Rs.20,000 cashback"\n';
+  p += '  - Prices: "₹12,34,990", "available at ₹8.5 Lakh"\n';
+  p += '  - Promotional actions: "book your test drive", "claim your offer", "grab the deal"\n';
+  p += '  - Urgency: "only 2 left", "expires tonight", "limited time"\n';
+  p += '  - Event names: "Navratri Sale", "Sunday Special", "Year-End Offer"\n';
+  p += '  - Interest rate offers: "@10.99% loans", "EMI starting ₹8,999"\n\n';
+  p += '✅ ALLOWED variable values — these are purely transactional and get utility approval:\n';
+  p += '  - Customer name: "Rahul Sharma", "Priya", "Yuvraaj"\n';
+  p += '  - Reference / Order IDs: "Order #SP-2026-4821", "Ref ID: SR-447123", "Delivery ID: 234"\n';
+  p += '  - Car model + year only (no price): "2021 Hyundai Creta", "Maruti Swift 2019"\n';
+  p += '  - Dates / times: "15th April 2026", "30/04/2026", "3:00 PM"\n';
+  p += '  - Process status: "documentation has been verified", "handover scheduled"\n';
+  p += '  - Tracking / action links: "www.spinny.com/track/12345", "spinny.com/order/4821"\n';
+  p += '  - Location: "Gurugram hub", "Sector 18, Noida"\n\n';
+  p += 'VARIABLE VALUE SELF-TEST: Before finalising each variable example, ask — "Could this appear in an order confirmation email from Amazon or a bank transaction SMS?" If YES → utility-safe. If NO → replace it.\n\n';
+  p += 'SAMPLE CONTENT SELF-TEST: Read your full sample_content out loud. Does it sound like a delivery notification, a service update, or a document status message? If it sounds like an advertisement or sales pitch even slightly — rewrite the variable values only (never the static text) until it sounds purely operational.\n\n';
+
+  p += APPROVED_EXAMPLES;
+  if (SHEET_INTEL) {
+    p += '\n\n██████████████████████████████████████████\n';
+    p += '  LIVE SHEET — SPINNY\'S REAL META SUBMISSION HISTORY\n';
+    p += '██████████████████████████████████████████\n';
+    p += 'These are actual templates submitted to Meta by Spinny with their real sample content and outcomes.\n\n';
+    p += 'HOW TO USE THIS DATA:\n';
+    p += '✅ APPROVED examples — study the sample content carefully. Notice how the variable values are purely transactional: Ref IDs, order numbers, dates, car models without prices, tracking links, process status descriptions. THIS is the style your variable values must match.\n';
+    p += '⛔ REJECTED examples — study what made variable values or sample content promotional. The rejection reason tells you exactly which pattern triggered marketing classification. Never reproduce that pattern.\n\n';
+    p += '⚠️ THIS SECTION NEVER OVERRIDES ANY RULE ABOVE. All verbatim, line-preservation, and variable-wrapping rules still apply fully.\n\n';
+    p += SHEET_INTEL;
+  }
+  p += '\nSAMPLE CONTENT RULE: Replace ONLY the {{n}} placeholders with realistic Indian dummy values. Copy every other word verbatim from the template body (including any CTA rewrites). Do NOT rephrase, rewrite, or substitute any static sentence.\n\n';
+  p += 'FINAL SELF-CHECK before outputting JSON — verify ALL of these:\n';
+  p += '  ✅ Line count in template_body matches line count in original copy exactly\n';
+  p += '  ✅ No lines from the original have been dropped, merged, or skipped\n';
+  p += '  ✅ No banned action/promotional words remain in any static text line\n';
+  p += '  ✅ CTA sentences use only neutral verbs: "view", "track", "check", "see", "schedule"\n';
+  p += '  ✅ No "book", "shortlist", "explore", "buy", "free", "exclusive", "offer", "grab" in static text\n';
+  p += '  ✅ All promotional chunks are wrapped as {{variables}}, not left as static text\n';
+  p += '  ✅ sample_content matches template_body exactly (with {{n}} swapped for dummy values)\n';
+  p += '  ✅ VERBATIM CHECK: For every static word in template_body — is it present in the original copy? If any static word was invented or rewritten, the output is WRONG. Go back and copy static words exactly.\n';
+  p += '  ✅ COUNT static words in template_body — if fewer than 15 total, you have a skeleton template. Go back and unwrap variables.\n';
+  p += '  ✅ CHECK every line with a variable — does it have at least 5 static words on that line? If not, you are over-wrapping.\n';
+  p += '  ✅ SCAN FOR "{{n}}: {{n+1}}" — if found anywhere, STOP and merge. A colon between two variables is always wrong.\n';
+  p += '  ✅ SCAN FOR any two consecutive {{variables}} with only punctuation or ≤4 words between them — merge into one.\n\n';
+  p += 'Respond ONLY with valid JSON. No markdown. No text before or after.\n\n';
+  p += '{"sample_content":"full message — {{n}} replaced with dummy values, all other text verbatim from template body","template_body":"full message with {{n}} placeholders — static text neutral and transactional, CTA reworded if it contained banned words","variables":[{"position":1,"name":"short_field_name","example":"realistic Indian dummy value"}],"transactional_hook":"one sentence — what makes this look like a transactional notification?","brand_tweaks":"list exactly which phrases were wrapped in variables AND any CTA words that were neutralised","verdict":"LIKELY_APPROVED","reason":"one sentence","tips":["tip 1"]}';
+  return p;
+}
+
+// ════════════════════════════════════════════════════════════
+//  CLAUDE API CALL
+// ════════════════════════════════════════════════════════════
+async function callClaude(prompt, maxTokens, retryCount){
+  maxTokens  = maxTokens  || 4000;
+  retryCount = retryCount || 0;
+  var body = {
+    model: CLAUDE_MODEL,
+    max_tokens: maxTokens,
+    temperature: 0.2,
+    messages: [{ role: 'user', content: prompt }]
+  };
+  var res;
+  try {
+    res = await fetch(CLAUDE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch(networkErr) {
+    throw new Error('Network error — check your internet connection and try again. (' + networkErr.message + ')');
+    throw new Error('Network error — check your internet connection and try again. (' + networkErr.message + ')');
+  }
+
+  // ── Rate limit handling ──
+  if(res.status === 429){
+    var errBody = {};
+    try { errBody = await res.json(); } catch(e){}
+
+    if(retryCount >= 1){
+      throw new Error('Rate limit reached.\n\nOptions:\n• Wait a moment and try again\n• Check your usage limits at console.anthropic.com');
+    }
+
+    // Wait 70 seconds and retry ONCE
+    var waitSec = 70;
+    var ldEls = document.querySelectorAll('.ld:not(.hidden)');
+    var origTexts = [];
+    ldEls.forEach(function(el){ origTexts.push(el.innerHTML); });
+
+    for(var s = waitSec; s > 0; s--){
+      ldEls.forEach(function(el){
+        el.innerHTML = '<div class="spin"></div>Rate limit hit — auto-retrying in ' + s + 's…';
+      });
+      await new Promise(function(resolve){ setTimeout(resolve, 1000); });
+    }
+    ldEls.forEach(function(el, i){ el.innerHTML = origTexts[i] || '<div class="spin"></div>Retrying…'; });
+    return callClaude(prompt, maxTokens, retryCount + 1);
+  }
+
+  if(!res.ok){
+    var msg = 'HTTP ' + res.status;
+    try { var j = await res.json(); msg = (j && j.error && j.error.message) ? j.error.message : msg; } catch(e){}
+    if(res.status === 400) msg = 'Bad request — make sure you pasted a valid Claude API key (starts with sk-ant-).';
+    if(res.status === 401) msg = 'Invalid or expired API key — disconnect and paste a fresh key from console.anthropic.com';
+    if(res.status === 403) msg = 'Access denied — check your API key permissions at console.anthropic.com';
+    throw new Error(msg);
+  }
+
+  var data = await res.json();
+
+  // Check stop reason — max_tokens means response was cut off
+  var stopReason = data.stop_reason || '';
+  if(stopReason === 'max_tokens'){
+    if(retryCount >= 2){ throw new Error('Response was cut off even with maximum tokens. Try shortening your input copy.'); }
+    return callClaude(prompt, maxTokens * 2, retryCount + 1);
+  }
+
+  var raw = '';
+  try { raw = data.content[0].text || ''; } catch(e) {
+    throw new Error('Empty response from Claude. Please try again.');
+  }
+
+  // Robustly extract JSON — strip markdown fences, then find outermost { }
+  var clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  var start = clean.indexOf('{');
+  var end   = clean.lastIndexOf('}');
+  if(start === -1 || end === -1) throw new Error('No valid JSON in response. Raw output: ' + clean.slice(0, 300));
+  clean = clean.slice(start, end + 1);
+  return JSON.parse(clean);
+}
+
+// ════════════════════════════════════════════════════════════
+//  GENERATE (single template)
+// ════════════════════════════════════════════════════════════
+async function generate(lob){
+  if(!API_KEY){ toast('\u26a0\ufe0f Please connect your Claude API key first'); return; }
+  var p    = lob[0];
+  var copy = document.getElementById(p+'-copy').value.trim();
+  var intent = '';
+  if(!copy){ toast('Please paste your message copy first'); return; }
+
+  document.getElementById(p+'-ld').classList.remove('hidden');
+  document.getElementById(p+'-out').classList.add('hidden');
+  document.getElementById(p+'-err').classList.add('hidden');
+
+  try{
+    var result = await callClaude(buildPrompt(lob, copy, intent), 4000);
+    last[lob] = result;
+    renderOut(lob, result);
+  }catch(e){
+    var el = document.getElementById(p+'-err');
+    el.textContent = '\u26a0\ufe0f ' + e.message;
+    el.classList.remove('hidden');
+  }finally{
+    document.getElementById(p+'-ld').classList.add('hidden');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDER OUTPUT
+// ════════════════════════════════════════════════════════════
+function renderOut(lob, r){
+  var p = lob[0];
+  document.getElementById(p+'-sc').textContent = r.sample_content || '';
+  document.getElementById(p+'-tb').innerHTML = (r.template_body || '').replace(/\{\{(\d+)\}\}/g,'<span class="vr">{{$1}}</span>');
+
+  var vw = document.getElementById(p+'-vtbl');
+  if(r.variables && r.variables.length){
+    vw.innerHTML = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mu);margin-bottom:8px">Variable Mapping</div><div class="tbl-wrap"><table><thead><tr><th>Variable</th><th>Field name</th><th>Sample value</th></tr></thead><tbody>' +
+      r.variables.map(function(v){ return '<tr><td><span class="var-pill">{{'+v.position+'}}</span></td><td style="font-weight:500">'+v.name+'</td><td style="font-family:DM Mono,monospace;font-size:11px">'+v.example+'</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  } else { vw.innerHTML = ''; }
+
+  var sw = document.getElementById(p+'-strategy');
+  var hookHtml  = r.transactional_hook ? '<div class="strategy-row"><div class="strategy-label">\ud83c\udfaf Hook used</div><div class="strategy-val">'+r.transactional_hook+'</div></div>' : '';
+  var tweakHtml = r.brand_tweaks       ? '<div class="strategy-row"><div class="strategy-label">\u270f\ufe0f Brand changes</div><div class="strategy-val">'+r.brand_tweaks+'</div></div>' : '';
+  sw.innerHTML = (hookHtml||tweakHtml) ? '<div class="strategy-box"><div class="strategy-ttl">\ud83d\udd0d Compliance Strategy</div>'+hookHtml+tweakHtml+'</div>' : '';
+
+  var ok = r.verdict === 'LIKELY_APPROVED';
+  var tipsHtml = (r.tips||[]).map(function(t){ return '<div class="tip" style="margin-top:6px">\ud83d\udca1 '+t+'</div>'; }).join('');
+  document.getElementById(p+'-verdict').innerHTML =
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">' +
+    '<span class="badge '+(ok?'b-ok':'b-no')+'"><span class="bdot"></span>'+(ok?'Likely Approved by Meta':'Needs Revision')+'</span>' +
+    '<span style="font-size:12px;color:var(--mu)">'+(r.reason||'')+'</span></div>'+tipsHtml;
+
+  document.getElementById(p+'-out').classList.remove('hidden');
+}
+
+// ════════════════════════════════════════════════════════════
+//  APPROVAL LOG
+// ════════════════════════════════════════════════════════════
+function saveLog(lob){
+  var p=lob[0], r=last[lob];
+  if(!r){ toast('Generate a template first'); return; }
+  var name = document.getElementById(p+'-name').value || 'unnamed_'+Date.now();
+  logs[lob].unshift({
+    id:Date.now(), name:name,
+    sample:r.sample_content, template:r.template_body, variables:r.variables,
+    hook:r.transactional_hook, tweaks:r.brand_tweaks,
+    aiVerdict:r.verdict, metaStatus:'pending', notes:'',
+    savedAt:new Date().toLocaleDateString('en-IN')
+  });
+  renderLog(lob);
+  switchTab(lob,'log');
+  toast('Saved to approval log \u2705');
+}
+function metaLabel(s){ return s==='approved'?'\u2705 Meta Approved':s==='rejected'?'\u274c Meta Rejected':s==='paused'?'\u23f8 Paused':'\u23f3 Pending'; }
+function metaClass(s){ return s==='approved'?'b-ok':s==='rejected'?'b-no':'b-pend'; }
+
+function renderLog(lob){
+  var p=lob[0], el=document.getElementById(p+'-log-list');
+  if(!logs[lob].length){ el.innerHTML='<div class="empty"><div class="ei">\ud83d\udceb</div>No templates saved yet.</div>'; return; }
+  el.innerHTML = logs[lob].map(function(e){
+    return '<div class="log-row"><div style="flex:1;min-width:0">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
+      '<span class="log-name">'+e.name+'</span>' +
+      '<span class="badge '+(e.aiVerdict==='LIKELY_APPROVED'?'b-ok':'b-no')+'" style="font-size:10px"><span class="bdot"></span>AI: '+(e.aiVerdict==='LIKELY_APPROVED'?'Likely Approved':'Needs Revision')+'</span>' +
+      '<span class="badge '+metaClass(e.metaStatus)+'" id="mb-'+e.id+'" style="font-size:10px"><span class="bdot"></span>'+metaLabel(e.metaStatus)+'</span>' +
+      '<span style="font-size:11px;color:var(--mu)">'+e.savedAt+'</span></div>' +
+      (e.hook?'<div style="font-size:11px;color:var(--gd);margin-bottom:5px">\ud83c\udfaf '+e.hook+'</div>':'') +
+      '<div class="log-sample">'+e.sample+'</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<span style="font-size:11px;color:var(--mu)">Meta status:</span>' +
+      '<select class="status-sel" onchange="updStatus(\''+lob+'\','+e.id+',this.value)">' +
+      '<option value="pending" '+(e.metaStatus==='pending'?'selected':'')+'>&#x23F3; Pending</option>' +
+      '<option value="approved" '+(e.metaStatus==='approved'?'selected':'')+'>&#x2705; Approved</option>' +
+      '<option value="rejected" '+(e.metaStatus==='rejected'?'selected':'')+'>&#x274C; Rejected</option>' +
+      '<option value="paused" '+(e.metaStatus==='paused'?'selected':'')+'>&#x23F8; Paused</option>' +
+      '</select>' +
+      '<input type="text" style="width:220px;padding:5px 10px;font-size:12px" placeholder="Notes e.g. rejection reason" value="'+e.notes+'" oninput="updNotes(\''+lob+'\','+e.id+',this.value)">' +
+      '<button class="btn btn-secondary btn-sm" style="color:#b91c1c;border-color:#fca5a5" onclick="delLog(\''+lob+'\','+e.id+')">Remove</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+function updStatus(lob,id,val){
+  var e=logs[lob].find(function(x){return x.id===id;});
+  if(e){ e.metaStatus=val; var b=document.getElementById('mb-'+id); if(b){ b.className='badge '+metaClass(val); b.style.fontSize='10px'; b.innerHTML='<span class="bdot"></span>'+metaLabel(val); } toast('Status updated'); }
+}
+function updNotes(lob,id,val){ var e=logs[lob].find(function(x){return x.id===id;}); if(e) e.notes=val; }
+function delLog(lob,id){ logs[lob]=logs[lob].filter(function(x){return x.id!==id;}); renderLog(lob); }
+
+function exportLog(lob){
+  if(!logs[lob].length){ toast('No log entries to export'); return; }
+  var rows=logs[lob].map(function(e){ return {'Template Name':e.name,'Sample Content':e.sample,'Template Body':e.template,'Variables':(e.variables||[]).map(function(v){return '{{'+v.position+'}}='+v.name;}).join(', '),'Transactional Hook':e.hook||'','Brand Changes':e.tweaks||'','AI Verdict':e.aiVerdict,'Meta Status':e.metaStatus,'Notes':e.notes,'Saved Date':e.savedAt}; });
+  var ws=XLSX.utils.json_to_sheet(rows); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Log');
+  XLSX.writeFile(wb,'approval_log_'+lob+'_'+Date.now()+'.xlsx');
+}
+
+// ════════════════════════════════════════════════════════════
+//  BULK REVIEW
+// ════════════════════════════════════════════════════════════
+function dov(e,id){ e.preventDefault(); document.getElementById(id).classList.add('drag'); }
+function dlv(id){ document.getElementById(id).classList.remove('drag'); }
+function ddr(e,fid,lob){ e.preventDefault(); dlv(lob[0]+'-upz'); var f=e.dataTransfer.files[0]; if(f) processXL(f,lob); }
+function handleXL(e,lob){ if(e.target.files[0]) processXL(e.target.files[0],lob); }
+
+async function processXL(file,lob){
+  if(!API_KEY){ toast('\u26a0\ufe0f Please connect your Claude API key first'); return; }
+  var p=lob[0];
+  var reader=new FileReader();
+  reader.onload=async function(e){
+    var wb=XLSX.read(e.target.result,{type:'binary'});
+    var ws=wb.Sheets[wb.SheetNames[0]];
+    var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){ toast('No data found in file'); return; }
+    document.getElementById(p+'-bsec').classList.remove('hidden');
+    var tb=document.getElementById(p+'-btb');
+    tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:1.5rem"><div class="ld" style="justify-content:center"><div class="spin"></div>Analysing '+rows.length+' templates — this may take a few minutes\u2026</div></td></tr>';
+    var results=[];
+    for(var i=0;i<rows.length;i++){
+      var row=rows[i];
+      var name=row['Template Name']||row['template_name']||row['Name']||('template_'+(i+1));
+      var copy=row['Message Copy']||row['message_copy']||row['Copy']||row['Message']||'';
+      if(!copy) continue;
+      var r=await quickReview(copy,lob);
+      results.push(Object.assign({name:name,copy:copy},r));
+      var pass=results.filter(function(x){return x.verdict==='LIKELY_APPROVED';}).length;
+      document.getElementById(p+'-st').textContent=results.length;
+      document.getElementById(p+'-sp').textContent=pass;
+      document.getElementById(p+'-sf').textContent=results.length-pass;
+    }
+    bulk[lob]=results;
+    renderBulk(lob,results);
+  };
+  reader.readAsBinaryString(file);
+}
+
+async function quickReview(copy,lob){
+  var prompt='WhatsApp utility template compliance expert for Spinny ('+lob+' LOB, Indian used-car marketplace). Convert this promotional copy to a Meta UTILITY template. ABSOLUTE RULES: (1) NEVER change, replace, rephrase, or rewrite any word from the original copy — not in the body, not in the CTA, not anywhere. (2) The ONLY tool you have is wrapping promotional spans in {{variables}}. Banned words (book, buy, purchase, grab, avail, shortlist, explore, discover, free, offer, deal, discount, exclusive, special, hurry, limited time, last chance, before midnight, earn, win, reward, gift) must be wrapped inside a variable — NOT replaced with neutral words. (3) Example: "Click the button below to book your Doorstep Car Evaluation today" → "Click the button below to {{3}}" with {{3}} sample="schedule your Doorstep Car Evaluation today". The static words "Click the button below to" are kept verbatim. (4) Sample content = replace {{n}} with dummy values; every other word must be verbatim from template_body. (5) NO INVENTED HEADERS: never add a standalone {{1}} header/ref-ID unless the original already had one. (6) VARIABLE RATIO: at least 60% of words must be static text. For every variable, there must be 6-8 words of static text around it. Generic transactional sentences like: your car handover has been initiated, your documentation has been verified — must stay as static text, they are NOT variables. Only wrap: names, car models, prices, amounts, dates, promotional phrases, links, and banned-word CTA actions. (7) CHUNKING: wrap each contiguous promotional block as ONE variable. MERGE RULE: count static words between two variables on the same line — if 4 or fewer static words separate them, merge into ONE variable. Comma, colon, dash, or short words (a, an, the, in, of, at, and, or, to) between variables = always merge. Hi {{2}}, {{3}} → WRONG, merge to Hi {{2}}. {{2}} at {{3}} → WRONG, merge to {{2}}. {{2}}: {{3}} → WRONG, merge to {{2}}. (8) LINE PRESERVATION: count the lines in the original — your template_body must have the exact same number of lines in the same order. NEVER drop, merge, or skip any line. A fully-promotional line becomes a single {{variable}} on its own line — never deleted. COPY: """'+copy+'""" Reply ONLY valid JSON (no fences, no extra text): {"sample_content":"...","template_body":"...","variables":[{"position":1,"name":"...","example":"..."}],"transactional_hook":"one sentence","verdict":"LIKELY_APPROVED","reason":"one sentence"}';
+  try{
+    return await callClaude(prompt,700);
+  }catch(e){
+    return {sample_content:copy,template_body:copy,variables:[],transactional_hook:'',verdict:'NEEDS_REVISION',reason:'Could not analyse — check API key and retry'};
+  }
+}
+
+function renderBulk(lob,results){
+  var p=lob[0];
+  document.getElementById(p+'-btb').innerHTML=results.map(function(r,i){
+    var ok=r.verdict==='LIKELY_APPROVED';
+    var vars=(r.variables||[]).map(function(v){return '<span class="var-pill">{{'+v.position+'}} '+v.name+'</span>';}).join(' ');
+    return '<tr><td style="color:var(--mu)">'+(i+1)+'</td><td style="font-weight:500">'+r.name+'</td><td style="font-family:DM Mono,monospace;font-size:11px;max-width:200px;line-height:1.5">'+(r.sample_content||'')+'</td><td><div style="display:flex;flex-wrap:wrap;gap:3px">'+(vars||'<span style="color:var(--mu);font-size:11px">none</span>')+'</div></td><td><span class="badge '+(ok?'b-ok':'b-no')+'"><span class="bdot"></span>'+(ok?'Likely Approved':'Needs Revision')+'</span></td><td style="font-size:11px;color:var(--mu);max-width:180px">'+(r.reason||'')+'</td></tr>';
+  }).join('');
+}
+
+function exportXL(lob){
+  if(!bulk[lob].length){ toast('No data to export'); return; }
+  var rows=bulk[lob].map(function(r){ return {'Template Name':r.name,'Sample Content':r.sample_content||'','Template Body':r.template_body||'','Variables':(r.variables||[]).map(function(v){return '{{'+v.position+'}}='+v.name;}).join(', '),'Transactional Hook':r.transactional_hook||'','AI Verdict':r.verdict,'Reason':r.reason}; });
+  var ws=XLSX.utils.json_to_sheet(rows); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Review');
+  XLSX.writeFile(wb,'bulk_review_'+lob+'_'+Date.now()+'.xlsx');
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════════
+function selectLob(lob){
+  document.querySelectorAll('.lob-card').forEach(function(c){c.classList.remove('active');});
+  document.getElementById('lob-'+lob).classList.add('active');
+  ['demand','supply'].forEach(function(l){document.getElementById('panel-'+l).classList.toggle('active',l===lob);});
+  document.getElementById('no-lob').classList.add('hidden');
+}
+function switchTab(lob,tab){
+  var tabs=['compose','review','log'];
+  var panel=document.getElementById('panel-'+lob);
+  panel.querySelectorAll('.tab-btn').forEach(function(b,i){b.classList.toggle('active',tabs[i]===tab);});
+  panel.querySelectorAll('.panel').forEach(function(el){el.classList.remove('active');});
+  document.getElementById(lob+'-'+tab).classList.add('active');
+}
+function clearF(lob){
+  var p=lob[0];
+  ['copy'].forEach(function(f){var el=document.getElementById(p+'-'+f);if(el)el.value='';}); 
+  document.getElementById(p+'-out').classList.add('hidden');
+  document.getElementById(p+'-err').classList.add('hidden');
+}
+function cp(id){
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(function(){toast('Copied \u2713');});
+}
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+</script>
+</body>
+</html>
