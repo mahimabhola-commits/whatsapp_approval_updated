@@ -158,7 +158,7 @@ tbody tr:hover{background:#fafaf8}
   <div class="logo-box">
     <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.849L.057 23.617a.75.75 0 00.91.91l5.82-1.463A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
   </div>
-  <span class="logo-name">MB WA Template Studio</span>
+  <span class="logo-name">WA Template Studio</span>
   <span class="badge-util">Utility Optimizer</span>
   <span class="badge-ai">⚡ Claude Sonnet 4.6</span>
 </header>
@@ -701,6 +701,7 @@ function buildPrompt(lob, copy, intent){
   p += 'DROPPING, MERGING, or SKIPPING any line is a critical failure — even if a line contains only promotional content.\n';
   p += 'A line that is entirely promotional becomes a single {{variable}} on its own line — it is NEVER deleted.\n\n';
   p += 'VERIFY BEFORE OUTPUT: Count original lines → count your template_body lines → they must match.\n\n';
+p += 'NO LINE SPLITTING: A single sentence from the original must never be broken into two lines to isolate a variable. If one original sentence has two promotional phrases, merge both into ONE variable — do not create a line break between them. WRONG: "Hey {{2}}, your preferred car is part of our {{3}}.\n{{4}}" ← "Grab upto ₹2.5 Lakh OFF before the window closes." was part of the same line in the original — creating {{4}} on a new line is an invented line. CORRECT: "Hey {{2}}, your preferred car is part of our {{3}}." ← merge "1-day sale today. Grab upto ₹2.5 Lakh OFF before the window closes" into {{3}} as one chunk.\n\n';
   p += 'EXAMPLE of correct line preservation:\n';
   p += '  Original (4 lines):\n';
   p += '    Line 1: "Hurry! Claim your discount."\n';
@@ -721,16 +722,32 @@ function buildPrompt(lob, copy, intent){
   p += 'PROMOTIONAL WORD HANDLING — WRAP, NEVER REWRITE\n';
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
   p += 'THE ABSOLUTE RULE: You are NEVER allowed to change, replace, rephrase, or rewrite ANY word from the original copy. Not in the body, not in the CTA, not anywhere.\n';
+p += 'CTA ACTION + LINK = ONE VARIABLE — NO EXCEPTIONS: A CTA line contains exactly one variable. The action verb AND the link are always merged into a single {{n}}. Never split them. WRONG: "Click here to {{5}}: {{6}}" ← two variables on one CTA line, ALWAYS wrong. CORRECT: "Click here to {{5}}" ← {{5}} = "book your car: www.spinny.com". The colon, the link, everything after "Click here to" goes into one variable.\n\n';
   p += 'The ONLY tool you have is wrapping a span of words in a {{variable}}.\n\n';
   p += 'PROMOTIONAL WORDS that cannot remain as static text (must be wrapped inside a {{variable}}):\n';
   p += '  book, booking, buy, purchase, grab, avail, claim,\n';
   p += '  free, offer, deal, discount, save, cashback,\n';
   p += '  explore, discover, browse, shortlist, wishlist,\n';
   p += '  hurry, limited time, last chance, expires, deadline, before midnight, by tonight,\n';
+p += '  sale, one-day sale, flash sale, live now, is live, going on,\n';
+p += '  tonight, midnight, today only, ends today, last day,\n';
   p += '  exclusive, special, best price, lowest price, unbeatable,\n';
   p += '  earn, win, reward, gift\n\n';
   p += 'HOW TO HANDLE THEM:\n';
+p += '⛔ STATIC SKELETON PURITY — THE RULE THAT DETERMINES APPROVAL:\n';
+p += 'After wrapping, read every static word left in the template body. If ANY static word is promotional, urgency-driven, or time-sensitive (sale, tonight, midnight, live now, one-day, going on, ends today, etc.) — the template WILL be rejected.\n';
+p += 'FIX: EXPAND the nearest variable\'s boundary to absorb that word. The variable grows, the static text shrinks, until the static skeleton contains ZERO promotional words.\n\n';
+p += 'REAL EXAMPLE — the actual approved pattern:\n';
+p += '  Original: "Hey [Name], our one-day sale is live now on all Spinny cars."\n';
+p += '  WRONG: "Hey {{2}}, our one-day sale is live now on all Spinny cars."  ← "one-day sale is live now on all" left as static → REJECTED\n';
+p += '  WRONG: "Hey {{2}}, our {{3}} is live now on all Spinny cars."  ← "is live now on all" still static → still REJECTED\n';
+p += '  CORRECT: "Hey {{2}} Spinny cars."  ← {{2}} swallows "[Name], our one-day sale is live now on all" — static skeleton is clean.\n\n';
+p += '  Original: "Click here to book your car before midnight:"\n';
+p += '  WRONG: "Click here to {{3}} before midnight:"  ← "before midnight" is urgency, left as static → REJECTED\n';
+p += '  CORRECT: "Click here to {{3}}"  ← {{3}} = "book your car before midnight: [link]" — variable absorbs the time-pressure phrase and link together.\n\n';
+p += 'THE PATTERN: The variable\'s span must cover ALL promotional/urgency content. Neutral connectors ("to", "on all", "for the") stay static ONLY if what remains reads like a backend notification.\n\n';
   p += '  Identify the minimal phrase containing the promotional word. Wrap that whole phrase as {{n}}.\n';
+  p += '  Do not add any promotional word or line such as "Sale is Live on 10,000+ Spinny Cars!" in the sample value also\n';
   p += '  Keep everything before and after that phrase exactly as written in the original.\n';
   p += '  The sample value for that variable should be a realistic neutral dummy.\n\n';
   p += 'WORKED EXAMPLES (study these carefully):\n\n';
@@ -837,7 +854,12 @@ function buildPrompt(lob, copy, intent){
   p += '- Instructional phrases: "Click here to", "You can also", "Please check"\n';
   p += '- Brand sign-off: "-Spinny", "-SellRight by Spinny"\n';
   p += '- Any sentence that has no promotional/personalised content in it\n\n';
-  p += 'RATIO RULE: For every variable in the template, there must be at least 6-8 words of static text. A template with 4+ variables and fewer than 20 static words is WRONG — reduce variables by keeping generic descriptive sentences as static text.\n\n';
+p += 'RATIO RULE: For every variable in the template, there must be at least 6-8 words of static text. A template with 4+ variables and fewer than 20 static words is WRONG — reduce variables by keeping generic descriptive sentences as static text.\n\n';
+
+// ADD THIS LINE:
+p += 'NO ADJACENT VARIABLES RULE: Two {{variables}} must never appear next to each other or on consecutive lines with no static text between them. There must be a minimum of 4 static words separating any two variables. If two promotional phrases sit side by side, merge them into ONE variable. WRONG: "your preferred car is part of our {{3}}. {{4}}" — merge into one: "your preferred car is part of our {{3}}". WRONG: "{{3}}\n{{4}}" on back-to-back lines — merge into "{{3}}".\n\n';
+// ADD THIS LINE:
+p += 'NO ADJACENT VARIABLES RULE: Two {{variables}} must never appear next to each other or on consecutive lines with no static text between them. There must be a minimum of 4 static words separating any two variables. If two promotional phrases sit side by side, merge them into ONE variable. WRONG: "your preferred car is part of our {{3}}. {{4}}" — merge into one: "your preferred car is part of our {{3}}". WRONG: "{{3}}\n{{4}}" on back-to-back lines — merge into "{{3}}".\n\n';
 
   p += 'WHAT IS SAFE — keep as exact static text (do not wrap in variables):\n';
   p += '- Greeting structure: "Hi" (the word itself, not the name)\n';
@@ -876,15 +898,19 @@ function buildPrompt(lob, copy, intent){
   p += 'VARIABLE VALUE RULES — THIS IS WHY TEMPLATES GET REJECTED\n';
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
   p += 'The variable "example" values you generate (shown to Meta as sample content) are the #1 reason templates get classified as MARKETING instead of UTILITY.\n\n';
-  p += '⛔ FORBIDDEN variable values — these will trigger marketing classification:\n';
-  p += '  - Offer amounts: "₹20,000 OFF", "upto ₹1 Lakh bonus", "Rs.20,000 cashback"\n';
-  p += '  - Prices: "₹12,34,990", "available at ₹8.5 Lakh"\n';
-  p += '  - Promotional actions: "book your test drive", "claim your offer", "grab the deal"\n';
-  p += '  - Urgency: "only 2 left", "expires tonight", "limited time"\n';
-  p += '  - Event names: "Navratri Sale", "Sunday Special", "Year-End Offer"\n';
-  p += '  - Interest rate offers: "@10.99% loans", "EMI starting ₹8,999"\n\n';
+p += '⛔ FORBIDDEN variable values — these will trigger marketing classification:\n';
+p += '  - Offer amounts: "₹20,000 OFF", "upto ₹1 Lakh bonus", "Rs.20,000 cashback"\n';
+p += '  - Prices: "₹12,34,990", "available at ₹8.5 Lakh"\n';
+p += '  - Promotional actions: "book your test drive", "claim your offer", "grab the deal"\n';
+p += '  - Urgency: "only 2 left", "expires tonight", "limited time"\n';
+p += '  - Event names: "Navratri Sale", "Sunday Special", "Year-End Offer"\n';
+p += '  - Interest rate offers: "@10.99% loans", "EMI starting ₹8,999"\n';
+p += '  - "Sale" anywhere in a variable — including Ref IDs and headers: NEVER "Sale Status Update | Ref ID: #SP-SALE-XXXXX". Use neutral event types only: "Order Update", "Delivery Notification", "Service Request Update"\n';
+p += '  - Day-count urgency in variable values: "1-day", "2-day", "24-hour" — these are urgency signals even inside a description\n';
+p += '  - Time-pressure words inside variable values: "today", "tonight", "midnight", "now" — even if the original copy had them, the sample value must NOT repeat them\n';
+p += '  - Field names that signal promotion: sale_event_detail, offer_amount, promo_detail — if your field_name contains "sale", "offer", or "promo", rename it to a neutral operational noun (e.g., service_detail, adjustment_detail, transaction_note)\n\n';
   p += '✅ ALLOWED variable values — these are purely transactional and get utility approval:\n';
-  p += '  - Customer name: "Rahul Sharma", "Priya", "Yuvraaj"\n';
+  p += '  - Customer name: "Mahi", "Ananya", "Yash"\n';
   p += '  - Reference / Order IDs: "Order #SP-2026-4821", "Ref ID: SR-447123", "Delivery ID: 234"\n';
   p += '  - Car model + year only (no price): "2021 Hyundai Creta", "Maruti Swift 2019"\n';
   p += '  - Dates / times: "15th April 2026", "30/04/2026", "3:00 PM"\n';
@@ -1001,14 +1027,20 @@ async function callClaude(prompt, maxTokens, retryCount){
   try { raw = data.content[0].text || ''; } catch(e) {
     throw new Error('Empty response from Claude. Please try again.');
   }
-
-  // Robustly extract JSON — strip markdown fences, then find outermost { }
-  var clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
-  var start = clean.indexOf('{');
-  var end   = clean.lastIndexOf('}');
-  if(start === -1 || end === -1) throw new Error('No valid JSON in response. Raw output: ' + clean.slice(0, 300));
-  clean = clean.slice(start, end + 1);
-  return JSON.parse(clean);
+// Robustly extract JSON — strip markdown fences, then find outermost JSON object
+var clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+// Use indexOf('{"') to skip any leading {{ variable }} text before the actual JSON object
+var start = clean.indexOf('{"');
+// Fallback to first { if no {" found
+if(start === -1) start = clean.indexOf('{');
+var end = clean.lastIndexOf('}');
+if(start === -1 || end === -1 || end <= start) throw new Error('No valid JSON in response. Raw output: ' + clean.slice(0, 300));
+clean = clean.slice(start, end + 1);
+// Escape unescaped newlines inside JSON string values
+clean = clean.replace(/("(?:[^"\\]|\\.)*")|[\n\r]/g, function(m, str) {
+  return str ? str : ' ';
+});
+return JSON.parse(clean);
 }
 
 // ════════════════════════════════════════════════════════════
