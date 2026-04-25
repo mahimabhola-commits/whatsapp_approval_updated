@@ -688,6 +688,7 @@ function buildPrompt(lob, copy, intent){
   p += '  CORRECT:  "{{2}} to Spinny for the {{3}}."  ← "Sell your [Hyundai i20]" is wrapped as {{2}} (commercial verb + car model = one promotional unit). "Best Price" is wrapped as {{3}}. "to Spinny for the" stays verbatim.\n\n';
   p += '  Original: "Unlock an exchange bonus of upto ₹20,000 for your next car purchase with Spinny."\n';
   p += '  CORRECT:  "Unlock {{4}} for your next car {{5}} with Spinny."  ← "an exchange bonus of upto ₹20,000" wrapped as {{4}}. "purchase" wrapped as {{5}} (banned word). All other words verbatim.\n\n';
+p += '  - BANNED field name words: "booking", "reward", "offer", "sale", "promo", "deal", "win", "voucher", "gift", "cashback". Rename to neutral operational nouns. booking_action → delivery_action or cta_detail. reward_detail → transaction_detail or account_credit_detail.\n\n';
   p += '  Original: "Click here if you\'re interested: [link]"\n';
   p += '  CORRECT:  "Click here {{6}}"  ← "if you\'re interested: [link]" wrapped as {{6}} (soft-sell qualifier + link = one promotional unit). "Click here" stays verbatim.\n\n';
   p += 'SELF-TEST before writing template_body: For every static word in your output, ask "Is this word in the original copy?" If the answer is NO — delete it. You cannot invent static words.\n\n';
@@ -897,6 +898,7 @@ p += 'NO ADJACENT VARIABLES RULE: Two {{variables}} must never appear next to ea
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
   p += 'VARIABLE VALUE RULES — THIS IS WHY TEMPLATES GET REJECTED\n';
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+p += '  - NEVER describe the promotional concept in the sample value — even if the variable wraps a voucher, prize, or reward. The sample must describe a PROCESS STATUS, not what the reward is. WRONG: "your TenxYou voucher (Ref ID: TXY-38291) has been processed" ← names the voucher. CORRECT: "transaction benefit recorded | Ref ID: TXY-38291" or "account credit processed | Case ID: TXY-38291" ← describes a process, zero promotional context.\n\n';
   p += 'The variable "example" values you generate (shown to Meta as sample content) are the #1 reason templates get classified as MARKETING instead of UTILITY.\n\n';
 p += '⛔ FORBIDDEN variable values — these will trigger marketing classification:\n';
 p += '  - Offer amounts: "₹20,000 OFF", "upto ₹1 Lakh bonus", "Rs.20,000 cashback"\n';
@@ -934,6 +936,7 @@ p += '  - Field names that signal promotion: sale_event_detail, offer_amount, pr
   }
   p += '\nSAMPLE CONTENT RULE: Replace ONLY the {{n}} placeholders with realistic Indian dummy values. Copy every other word verbatim from the template body (including any CTA rewrites). Do NOT rephrase, rewrite, or substitute any static sentence.\n\n';
   p += 'FINAL SELF-CHECK before outputting JSON — verify ALL of these:\n';
+p += '  ✅ OFFER/WIN/VOUCHER CHECK: Scan every static word for: "offer", "win", "voucher", "prize", "reward", "valid for", "only valid" — these are promotional and must be wrapped. WRONG: "Please note, this offer is only valid for car deliveries taken on {{4}}" ← "this offer is only valid for car deliveries taken on" must be absorbed into the variable or wrapped separately.\n';
   p += '  ✅ Line count in template_body matches line count in original copy exactly\n';
   p += '  ✅ No lines from the original have been dropped, merged, or skipped\n';
   p += '  ✅ No banned action/promotional words remain in any static text line\n';
