@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WA Template Studio</title>
+<title>WA Template Studio v11</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&amp;family=DM+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -158,7 +158,7 @@ tbody tr:hover{background:#fafaf8}
   <div class="logo-box">
     <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.849L.057 23.617a.75.75 0 00.91.91l5.82-1.463A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
   </div>
-  <span class="logo-name">MB WA Template Studio</span>
+  <span class="logo-name">WA Template Studio</span>
   <span class="badge-util">Utility Optimizer</span>
   <span class="badge-ai">⚡ Claude Sonnet 4.6</span>
 </header>
@@ -187,24 +187,8 @@ tbody tr:hover{background:#fafaf8}
 
   <!-- SHEET STRIP -->
   <div class="sheet-strip" id="sheet-strip">
-    📊 <strong>Reference sheet:</strong>&nbsp; <span id="sheet-status">Paste your Apps Script URL below to connect live sheet data.</span>
+    📊 <strong>Reference sheet:</strong>&nbsp; <span id="sheet-status">Connecting to sheet…</span>
     <a href="https://docs.google.com/spreadsheets/d/1jZfvZ-NySW5afPlxMg1kA3jrluiR1JF9A362QaV36uo/edit" target="_blank">View sheet ↗</a>
-  </div>
-  <div class="api-banner" id="gas-banner" style="margin-bottom:1rem">
-    <div class="api-ico">📋</div>
-    <div class="api-info">
-      <h3 id="gas-heading">Connect Google Apps Script URL</h3>
-      <p>In your sheet → <strong>Extensions → Apps Script</strong> → paste the <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace">doGet()</code> web app URL here. <a href="https://docs.google.com/spreadsheets/d/1jZfvZ-NySW5afPlxMg1kA3jrluiR1JF9A362QaV36uo/edit" target="_blank">Open sheet ↗</a></p>
-    </div>
-    <div class="api-controls">
-      <div class="api-input-row">
-        <input class="api-input" type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" onkeydown="if(event.key==='Enter')saveGasUrl()">
-        <button class="btn btn-primary btn-sm" id="gas-connect-btn" onclick="saveGasUrl()">Connect</button>
-        <button class="btn btn-secondary btn-sm hidden" id="gas-disconnect-btn" onclick="clearGasUrl()">Disconnect</button>
-      </div>
-      <div class="api-note">URL starts with <code style="background:var(--bg);padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace">https://script.google.com/macros/s/</code></div>
-      <div class="api-status hidden" id="gas-status">✅ Apps Script connected — sheet data loading…</div>
-    </div>
   </div>
 
   <!-- ══ MAIN PANEL ══ -->
@@ -468,39 +452,12 @@ function parseCSV(text) {
   return rows;
 }
 
-var GAS_URL = '';
-var GUIDELINES_URL = 'https://script.google.com/macros/s/AKfycbyTeKQ8I-yyu1I8ZMTdhWRlEyi8rP1BMUSrreTqcqKUUn8TeENfpxlPYgAA_ZV8uZSA/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbyQmNpZiXh6EyXmEd9HDKGOygpRvi9ICJ36N5haQxda1A7vJp2xiwiC6Bjpq6ecD5gd/exec';
+var GUIDELINES_URL = 'https://script.google.com/macros/s/AKfycbyQmNpZiXh6EyXmEd9HDKGOygpRvi9ICJ36N5haQxda1A7vJp2xiwiC6Bjpq6ecD5gd/exec';
 var EXTRA_GUIDELINES = ''; // loaded once on page ready
 
-function saveGasUrl() {
-  var val = document.getElementById('gas-url-input').value.trim();
-  if (!val.startsWith('https://script.google.com/macros/s/')) {
-    alert('Please paste a valid Apps Script web app URL.\nIt should start with:\nhttps://script.google.com/macros/s/');
-    return;
-  }
-  GAS_URL = val;
-  document.getElementById('gas-url-input').value = val.slice(0,40) + '…';
-  document.getElementById('gas-url-input').disabled = true;
-  document.getElementById('gas-connect-btn').classList.add('hidden');
-  document.getElementById('gas-disconnect-btn').classList.remove('hidden');
-  document.getElementById('gas-status').classList.remove('hidden');
-  document.getElementById('gas-banner').classList.add('connected');
-  document.getElementById('gas-heading').textContent = 'Apps Script connected ✓';
-  loadSheetIntel();
-}
 
-function clearGasUrl() {
-  GAS_URL = '';
-  document.getElementById('gas-url-input').value = '';
-  document.getElementById('gas-url-input').disabled = false;
-  document.getElementById('gas-connect-btn').classList.remove('hidden');
-  document.getElementById('gas-disconnect-btn').classList.add('hidden');
-  document.getElementById('gas-status').classList.add('hidden');
-  document.getElementById('gas-banner').classList.remove('connected');
-  document.getElementById('gas-heading').textContent = 'Connect Google Apps Script URL';
-  document.getElementById('sheet-status').textContent = 'Disconnected — paste Apps Script URL to reconnect.';
-  SHEET_INTEL = '';
-}
+
 
 async function loadGuidelines() {
   try {
@@ -530,10 +487,6 @@ async function loadGuidelines() {
 
 async function loadSheetIntel() {
   var statusEl = document.getElementById('sheet-status');
-  if (!GAS_URL) {
-    statusEl.textContent = 'Paste your Apps Script URL above to load live sheet data.';
-    return;
-  }
   statusEl.textContent = 'Loading sheet data…';
   try {
     var res = await fetch(GAS_URL, { cache: 'no-store' });
@@ -845,7 +798,7 @@ p += 'THE PATTERN: The variable\'s span must cover ALL promotional/urgency conte
   p += '- A URL/link placeholder\n';
   p += '- COMMERCIAL ACTION VERBS at the start of a line: "Sell your", "Buy your", "Book your", "Grab your", "Claim your" — these are promotional even if not in the banned list. When a line starts with one of these verbs followed by a car model or item, wrap the ENTIRE phrase (verb + item) as ONE variable. Do NOT leave "Sell your" as static text.\n';
   p += '  WRONG: "Sell your {{2}} to Spinny for the {{3}}"  ← "Sell your" left as static — WRONG\n';
-  p += '  CORRECT: "{{2}} to Spinny for the {{3}}"  ← {{2}} = "Sell your Hyundai i20" in original → sample = "Your Hyundai i20 documentation has been processed"\n';
+  p += '  CORRECT: "{{2}} to Spinny for the {{3}}"  ← {{2}} wraps "Sell your Hyundai i20" from the original. Variable EXAMPLE value should be transactional: "2021 Hyundai i20 (Ref: SR-447123)"\n';
   p += '- CTA SOFT-SELL QUALIFIERS: "if you\'re interested", "to explore", "to grab", "to avail", "to book it", "to claim" — these are promotional intent phrases. When a CTA line ends with one of these qualifiers (with or without a link), wrap the qualifier + link together as ONE variable.\n';
   p += '  WRONG: "Click here if you\'re interested: {{6}}"  ← "if you\'re interested" left as static — promotional intent, WRONG\n';
   p += '  CORRECT: "Click here {{6}}"  ← {{6}} = "if you\'re interested: www.spinny.com" → sample = "to track your exchange status: www.spinny.com"\n\n';
@@ -898,29 +851,64 @@ p += 'NO ADJACENT VARIABLES RULE: Two {{variables}} must never appear next to ea
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
   p += 'VARIABLE VALUE RULES — THIS IS WHY TEMPLATES GET REJECTED\n';
   p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-p += '  - NEVER describe the promotional concept in the sample value — even if the variable wraps a voucher, prize, or reward. The sample must describe a PROCESS STATUS, not what the reward is. WRONG: "your TenxYou voucher (Ref ID: TXY-38291) has been processed" ← names the voucher. CORRECT: "transaction benefit recorded | Ref ID: TXY-38291" or "account credit processed | Case ID: TXY-38291" ← describes a process, zero promotional context.\n\n';
-  p += 'The variable "example" values you generate (shown to Meta as sample content) are the #1 reason templates get classified as MARKETING instead of UTILITY.\n\n';
-p += '⛔ FORBIDDEN variable values — these will trigger marketing classification:\n';
-p += '  - Offer amounts: "₹20,000 OFF", "upto ₹1 Lakh bonus", "Rs.20,000 cashback"\n';
-p += '  - Prices: "₹12,34,990", "available at ₹8.5 Lakh"\n';
-p += '  - Promotional actions: "book your test drive", "claim your offer", "grab the deal"\n';
-p += '  - Urgency: "only 2 left", "expires tonight", "limited time"\n';
-p += '  - Event names: "Navratri Sale", "Sunday Special", "Year-End Offer"\n';
-p += '  - Interest rate offers: "@10.99% loans", "EMI starting ₹8,999"\n';
-p += '  - "Sale" anywhere in a variable — including Ref IDs and headers: NEVER "Sale Status Update | Ref ID: #SP-SALE-XXXXX". Use neutral event types only: "Order Update", "Delivery Notification", "Service Request Update"\n';
-p += '  - Day-count urgency in variable values: "1-day", "2-day", "24-hour" — these are urgency signals even inside a description\n';
-p += '  - Time-pressure words inside variable values: "today", "tonight", "midnight", "now" — even if the original copy had them, the sample value must NOT repeat them\n';
-p += '  - Field names that signal promotion: sale_event_detail, offer_amount, promo_detail — if your field_name contains "sale", "offer", or "promo", rename it to a neutral operational noun (e.g., service_detail, adjustment_detail, transaction_note)\n\n';
-  p += '✅ ALLOWED variable values — these are purely transactional and get utility approval:\n';
-  p += '  - Customer name: "Mahi", "Ananya", "Yash"\n';
-  p += '  - Reference / Order IDs: "Order #SP-2026-4821", "Ref ID: SR-447123", "Delivery ID: 234"\n';
-  p += '  - Car model + year only (no price): "2021 Hyundai Creta", "Maruti Swift 2019"\n';
-  p += '  - Dates / times: "15th April 2026", "30/04/2026", "3:00 PM"\n';
-  p += '  - Process status: "documentation has been verified", "handover scheduled"\n';
-  p += '  - Tracking / action links: "www.spinny.com/track/12345", "spinny.com/order/4821"\n';
-  p += '  - Location: "Gurugram hub", "Sector 18, Noida"\n\n';
-  p += 'VARIABLE VALUE SELF-TEST: Before finalising each variable example, ask — "Could this appear in an order confirmation email from Amazon or a bank transaction SMS?" If YES → utility-safe. If NO → replace it.\n\n';
-  p += 'SAMPLE CONTENT SELF-TEST: Read your full sample_content out loud. Does it sound like a delivery notification, a service update, or a document status message? If it sounds like an advertisement or sales pitch even slightly — rewrite the variable values only (never the static text) until it sounds purely operational.\n\n';
+  p += 'The variable "example" values (shown to Meta as sample content) MUST be transactional dummy values — not the original promotional content. This is how Meta sees a utility message.\n\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'TWO SEPARATE JOBS — DO NOT CONFUSE THEM:\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'JOB 1 — template_body: Keep all static text VERBATIM from the original copy. Wrap only promotional spans as {{n}}. Do NOT rewrite any word.\n\n';
+  p += 'JOB 2 — variable example values: Replace the promotional content with transactional dummy values. This is what Meta evaluates. The original promo content (prices, sale names, CTA verbs) must NOT appear here — replace it with neutral, process-oriented language.\n\n';
+  p += 'sample_content = template_body with every {{n}} swapped for its transactional dummy value. The static text in sample_content is 100% verbatim from template_body. Only the {{n}} positions change.\n\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'HOW TO GENERATE TRANSACTIONAL VARIABLE VALUES:\n';
+  p += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+  p += 'For EACH variable, look at what the original copy had in that position, then replace it with a transactional equivalent:\n\n';
+  p += '  Original had a CUSTOMER NAME → example: "Rahul", "Ananya", "Yash"\n\n';
+  p += '  Original had a CAR MODEL / COLLECTION NAME → example: "sedan inventory | Delivery Ref: #SP-334821"\n\n';
+  p += '  Original had a PRICE or OFFER AMOUNT (e.g. "₹2 Lakh OFF", "₹12,34,990") → example: "revised confirmed amount | Case ID: SR-447123" or "updated transaction amount"\n\n';
+  p += '  Original had a SALE/EVENT NAME (e.g. "Navratri Sale", "Sunday Special") → example: "scheduled service update | Ref: SP-2026-0427"\n\n';
+  p += '  Original had a CTA with banned verb (e.g. "book your test drive: link", "shortlist and buy: link") → example: "view your delivery status: www.spinny.com/track/SP-334821"\n\n';
+  p += '  Original had an URGENCY PHRASE (e.g. "only today", "before midnight") → example: "as per your confirmed appointment"\n\n';
+  p += '  Original had a LOCATION → example: "Gurugram hub", "Sector 18, Noida"\n\n';
+  p += '  Original had a LINK only → example: "www.spinny.com/track/12345"\n\n';
+  p += 'WORKED EXAMPLE:\n';
+  p += '  Original copy: "Hi {name}, We\'ve updated our {sedan} collection with top picks like {make} {model}, all under ₹{max price}. Click to shortlist and book a test drive: {link} -Spinny"\n\n';
+  p += '  template_body (static text verbatim, promotional spans wrapped):\n';
+  p += '    "Hi {{1}}\n    We\'ve updated our {{2}}\n    Click to {{3}}\n    -Spinny"\n\n';
+  p += '  Variable example values (transactional — NOT original promo content):\n';
+  p += '    {{1}} = "Rahul"\n';
+  p += '    {{2}} = "sedan inventory | Delivery Ref: #SP-334821 — your shortlisted vehicle is ready for handover"\n';
+  p += '    {{3}} = "view your delivery status: www.spinny.com/track/SP-334821"\n\n';
+  p += '  sample_content (template_body with {{n}} swapped for above values — static text 100% verbatim):\n';
+  p += '    "Hi Rahul\n    We\'ve updated our sedan inventory | Delivery Ref: #SP-334821 — your shortlisted vehicle is ready for handover\n    Click to view your delivery status: www.spinny.com/track/SP-334821\n    -Spinny"\n\n';
+  p += '  ✅ This reads like a delivery notification. The static words "We\'ve updated our" and "Click to" are from the original. Only the {{n}} values are transactional substitutes.\n\n';
+  p += '⛔ FORBIDDEN in variable example values — ZERO EXCEPTIONS:\n';
+  p += '  THE HARD RULE: If a word or phrase appears in the original promotional copy, it CANNOT appear in any variable example value. Every variable example must be freshly invented transactional language, regardless of what the original had.\n\n';
+  p += '  EXACT FAILURE CASE (from production — do NOT repeat this):\n';
+  p += '  Original line 1: "Sale is Live on 10,000+ Spinny Cars! 🚗"\n';
+  p += '  WRONG {{1}} example: "Sale is Live on 10,000+ Spinny Cars!" ← copied directly from original. REJECTED by Meta.\n';
+  p += '  CORRECT {{1}} example: "Inventory Status Update | Ref: SP-2026-0427" ← neutral notification header, zero promo words.\n\n';
+  p += '  Original line 2 had "1-day sale today. Grab upto ₹2.5 Lakh OFF before the window closes."\n';
+  p += '  WRONG {{3}} example: "1-day sale today. Grab upto ₹2.5 Lakh OFF..." ← copied from original. REJECTED.\n';
+  p += '  CORRECT {{3}} example: "scheduled delivery update today. Your Toyota Corolla 2020 (Order #SP-2026-4821) has been confirmed for handover." ← transactional narrative, no promo signals.\n\n';
+  p += '  Original CTA: "book your car: link"\n';
+  p += '  WRONG {{4}} example: "book your car: www.spinny.com" ← banned verb + original copy. REJECTED.\n';
+  p += '  CORRECT {{4}} example: "view your delivery confirmation: www.spinny.com/track/SP-334821" ← neutral verb, transactional context.\n\n';
+  p += '  SPECIFICALLY FORBIDDEN in examples — these come directly from original promo copy:\n';
+  p += '  - Sale announcements: "Sale is Live", "1-day sale", "Sunday Sale", "Navratri Sale"\n';
+  p += '  - Offer amounts: "₹2.5 Lakh OFF", "upto ₹20,000", "₹12,34,990"\n';
+  p += '  - Urgency phrases: "before the window closes", "expires tonight", "only today", "limited time"\n';
+  p += '  - Banned CTA verbs: "book your car", "grab the deal", "claim your offer", "shortlist"\n';
+  p += '  - "Sale" anywhere in example values including Ref IDs — NEVER "SP-SALE-XXXXX"\n\n';
+  p += '✅ ALWAYS USE these patterns for variable example values:\n';
+  p += '  - For a HEADER/ANNOUNCEMENT line → "Inventory Status Update | Ref: SP-2026-0427" or "Delivery Notification | Order: SP-334821"\n';
+  p += '  - For a CUSTOMER NAME → "Rahul", "Ananya", "Yash"\n';
+  p += '  - For a CAR MODEL or COLLECTION → "2021 Toyota Corolla (Order #SP-2026-4821)"\n';
+  p += '  - For a SALE EVENT + OFFER AMOUNT line → "scheduled delivery update. Your [Car] (Order #SP-XXXXX) has been confirmed for handover."\n';
+  p += '  - For a CTA with banned verb → "view your delivery confirmation: www.spinny.com/track/SP-334821"\n';
+  p += '  - For a PRICE/AMOUNT → "updated transaction amount | Case ID: SR-447123"\n';
+  p += '  - For a LOCATION → "Gurugram hub", "Sector 18, Noida"\n\n';
+  p += '⛔ FORBIDDEN field name words: "booking", "reward", "offer", "sale", "promo", "deal", "win", "voucher", "gift", "cashback". Rename: booking_action → cta_detail. reward_detail → transaction_detail.\n\n';
+  p += 'SAMPLE CONTENT SELF-TEST: Scan every word in sample_content. If ANY word came directly from the original promotional copy and is a sale name, price, offer amount, urgency phrase, or banned CTA verb — it must be replaced with a transactional equivalent. The static text between variables is verbatim from template_body. Only the variable positions must be transactional substitutes.\n\n';
 
   p += APPROVED_EXAMPLES;
   if (SHEET_INTEL) {
@@ -948,9 +936,9 @@ p += '  ✅ OFFER/WIN/VOUCHER CHECK: Scan every static word for: "offer", "win",
   p += '  ✅ COUNT static words in template_body — if fewer than 15 total, you have a skeleton template. Go back and unwrap variables.\n';
   p += '  ✅ CHECK every line with a variable — does it have at least 5 static words on that line? If not, you are over-wrapping.\n';
   p += '  ✅ SCAN FOR "{{n}}: {{n+1}}" — if found anywhere, STOP and merge. A colon between two variables is always wrong.\n';
-  p += '  ✅ SCAN FOR any two consecutive {{variables}} with only punctuation or ≤4 words between them — merge into one.\n\n';
+  p += '  ✅ PROMO LEAK CHECK: Scan every variable example value — does any word or phrase match the original promotional copy? Sale names, prices, offer amounts, urgency phrases, banned CTA verbs must NOT appear in any example value. If found, replace with a transactional equivalent.\n';
   p += 'Respond ONLY with valid JSON. No markdown. No text before or after.\n\n';
-  p += '{"sample_content":"full message — {{n}} replaced with dummy values, all other text verbatim from template body","template_body":"full message with {{n}} placeholders — static text neutral and transactional, CTA reworded if it contained banned words","variables":[{"position":1,"name":"short_field_name","example":"realistic Indian dummy value"}],"transactional_hook":"one sentence — what makes this look like a transactional notification?","brand_tweaks":"list exactly which phrases were wrapped in variables AND any CTA words that were neutralised","verdict":"LIKELY_APPROVED","reason":"one sentence","tips":["tip 1"]}';
+  p += '{"sample_content":"full message — static text VERBATIM from template_body, {{n}} replaced with transactional dummy values (NOT original promo content)","template_body":"full message with {{n}} placeholders — static text verbatim from original copy, promotional words wrapped as variables","variables":[{"position":1,"name":"short_field_name","example":"transactional dummy value — NOT the original promotional content. E.g. if original had a price, example is a Ref ID. If original had a banned CTA, example is a neutral action like view/track."}],"transactional_hook":"one sentence — what makes this look like a utility notification?","brand_tweaks":"list exactly which phrases were wrapped in variables","verdict":"LIKELY_APPROVED","reason":"one sentence","tips":["tip 1"]}';
   return p;
 }
 
